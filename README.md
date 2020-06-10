@@ -1,16 +1,7 @@
-# contract-template
+# Multi-Sig Admin Contract
 
-Use this pre-configured template for smart contract projects.
-
-Features:
-
-- Truffle
-- Ganache
-- TypeScript
-- TypeScript and Solidity auto-formatting
-- TypeScript and Solidity code linting
-- Solidity Test Coverage
-- Slither
+This generic standalone contract can be used to retrofit a highly-configurable
+multi-sig approval process to any existing smart contract.
 
 ## Setup
 
