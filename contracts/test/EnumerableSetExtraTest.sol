@@ -24,29 +24,39 @@
 
 pragma solidity 0.6.8;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import { EnumerableSetExtra } from "../util/EnumerableSetExtra.sol";
 
-contract HelloWorld is Ownable {
-    string private _message = "Hello, world!";
+contract EnumerableSetExtraTest {
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSetExtra for EnumerableSet.AddressSet;
+    using EnumerableSetExtra for EnumerableSet.UintSet;
 
-    event MessageChanged(address indexed setter);
+    EnumerableSet.AddressSet private _addressSet;
+    EnumerableSet.UintSet private _uintSet;
 
-    constructor() public Ownable() {}
-
-    /**
-     * @notice Get the message
-     * @return Message
-     */
-    function getMessage() external view returns (string memory) {
-        return _message;
+    function addAddress(address value) external {
+        _addressSet.add(value);
     }
 
-    /**
-     * @notice Set the message
-     * @param message   Message
-     */
-    function setMessage(string calldata message) external onlyOwner {
-        _message = message;
-        emit MessageChanged(msg.sender);
+    function addUint(uint256 value) external {
+        _uintSet.add(value);
+    }
+
+    function elementsInAddressSet() external view returns (address[] memory) {
+        return _addressSet.elements();
+    }
+
+    function elementsInUintSet() external view returns (uint256[] memory) {
+        return _uintSet.elements();
+    }
+
+    function clearAddressSet() external {
+        _addressSet.clear();
+    }
+
+    function clearUintSet() external {
+        _uintSet.clear();
     }
 }
