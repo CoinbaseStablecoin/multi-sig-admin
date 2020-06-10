@@ -4,7 +4,9 @@
 import { AdministrableContract } from "./Administrable";
 import { EnumerableSetExtraTestContract } from "./EnumerableSetExtraTest";
 import { MigrationsContract } from "./Migrations";
+import { MultiSigAdminContract } from "./MultiSigAdmin";
 import { OwnableContract } from "./Ownable";
+import { TestTargetContract } from "./TestTarget";
 
 declare global {
   namespace Truffle {
@@ -12,7 +14,9 @@ declare global {
       require(name: "Administrable"): AdministrableContract;
       require(name: "EnumerableSetExtraTest"): EnumerableSetExtraTestContract;
       require(name: "Migrations"): MigrationsContract;
+      require(name: "MultiSigAdmin"): MultiSigAdminContract;
       require(name: "Ownable"): OwnableContract;
+      require(name: "TestTarget"): TestTargetContract;
     }
   }
 }
@@ -23,4 +27,6 @@ export {
   EnumerableSetExtraTestInstance
 } from "./EnumerableSetExtraTest";
 export { MigrationsContract, MigrationsInstance } from "./Migrations";
+export { MultiSigAdminContract, MultiSigAdminInstance } from "./MultiSigAdmin";
 export { OwnableContract, OwnableInstance } from "./Ownable";
+export { TestTargetContract, TestTargetInstance } from "./TestTarget";
