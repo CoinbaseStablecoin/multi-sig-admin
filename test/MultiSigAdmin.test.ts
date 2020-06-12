@@ -57,7 +57,8 @@ contract("MultiSigAdmin", (accounts) => {
       await msa.configure(
         target1.address,
         setFoo,
-        3,
+        3, // minApprovals
+        20, // maxOpenProposals (per approver)
         [approver1, approver2, approver3],
         { from: admin1 }
       ),
@@ -65,21 +66,43 @@ contract("MultiSigAdmin", (accounts) => {
         target1.address,
         setBar,
         2,
+        10,
         [approver1, approver2, approver3],
         { from: admin1 }
       ),
-      await msa.configure(target2.address, setFoo, 2, [approver1, approver2], {
-        from: admin2,
-      }),
-      await msa.configure(target2.address, setBar, 1, [approver1, approver2], {
-        from: admin2,
-      }),
-      await msa.configure(target1.address, revertWithError, 1, [approver1], {
+      await msa.configure(
+        target2.address,
+        setFoo,
+        2,
+        3,
+        [approver1, approver2],
+        {
+          from: admin2,
+        }
+      ),
+      await msa.configure(
+        target2.address,
+        setBar,
+        1,
+        2,
+        [approver1, approver2],
+        {
+          from: admin2,
+        }
+      ),
+      await msa.configure(target1.address, revertWithError, 1, 1, [approver1], {
         from: admin1,
       }),
-      await msa.configure(target1.address, revertWithoutError, 1, [approver1], {
-        from: admin1,
-      }),
+      await msa.configure(
+        target1.address,
+        revertWithoutError,
+        1,
+        1,
+        [approver1],
+        {
+          from: admin1,
+        }
+      ),
     ];
   };
 
@@ -170,19 +193,23 @@ contract("MultiSigAdmin", (accounts) => {
         target1.address,
         setFoo,
         2,
+        3,
         [approver1, approver2, approver3],
         {
           from: admin1,
         }
       );
 
-      await msa.configure(target1.address, setFoo, 1, [approver1], {
+      await msa.configure(target1.address, setFoo, 1, 5, [approver1], {
         from: admin2,
       });
 
       expect(
         (await msa.getMinApprovals(target1.address, setFoo)).toNumber()
       ).to.equal(1);
+      expect(
+        (await msa.getMaxOpenProposals(target1.address, setFoo)).toNumber()
+      ).to.equal(5);
       expect(await msa.getApprovers(target1.address, setFoo)).to.eql([
         approver1,
       ]);
@@ -190,7 +217,7 @@ contract("MultiSigAdmin", (accounts) => {
 
     it("does not allow the minimum number of approvals to be set to zero", async () => {
       await expectRevert(
-        msa.configure(target1.address, setFoo, 0, [approver1], {
+        msa.configure(target1.address, setFoo, 0, 1, [approver1], {
           from: admin1,
         }),
         "minApprovals is zero"
@@ -199,16 +226,25 @@ contract("MultiSigAdmin", (accounts) => {
 
     it("does not allow the number of approvers to be fewer than the minimum number of approvals needed", async () => {
       await expectRevert(
-        msa.configure(target1.address, setFoo, 2, [approver1], {
+        msa.configure(target1.address, setFoo, 2, 1, [approver1], {
           from: admin1,
         }),
         "approvers fewer than minApprovals"
       );
     });
 
+    it("does not allow the maximum number of open proposals per approver to be set to zero", async () => {
+      await expectRevert(
+        msa.configure(target1.address, setFoo, 1, 0, [approver1], {
+          from: admin1,
+        }),
+        "maxOpenProposals is zero"
+      );
+    });
+
     it("does not allow the target contract to be the zero address", async () => {
       await expectRevert(
-        msa.configure(ZERO_ADDRESS, setFoo, 1, [approver1], {
+        msa.configure(ZERO_ADDRESS, setFoo, 1, 1, [approver1], {
           from: admin1,
         }),
         "targetContract is the zero address"
@@ -221,6 +257,7 @@ contract("MultiSigAdmin", (accounts) => {
           target1.address,
           setFoo,
           3,
+          1,
           [approver1, approver2, approver3],
           { from: approver1 }
         ),
@@ -228,7 +265,7 @@ contract("MultiSigAdmin", (accounts) => {
       );
 
       await expectRevert(
-        msa.configure(target1.address, setBar, 1, [approver2], {
+        msa.configure(target1.address, setBar, 1, 1, [approver2], {
           from: approver2,
         }),
         "caller is not an admin"
@@ -362,6 +399,54 @@ contract("MultiSigAdmin", (accounts) => {
       expect((await msa.getNumApprovals(proposalId)).toNumber()).to.equal(0);
       expect(await msa.getApprovals(proposalId)).to.eql([]);
       expect(await msa.isExecutable(proposalId)).to.equal(false);
+    });
+
+    it("does not allow creating a proposal when the maximum number of open proposal per approver is reached for the proposer", async () => {
+      const createProposal = (from: string) =>
+        proposeAndGetId(
+          target2.address,
+          setFoo,
+          [["string"], ["such amaze"]],
+          from
+        );
+
+      // maxOpenProposals for target2.setFoo = 3
+      // Create three proposals from approver1
+      const [proposal1Id] = await createProposal(approver1);
+      await createProposal(approver1);
+      await createProposal(approver1);
+
+      // Create a proposal from approver2 - should not be affected
+      await createProposal(approver2);
+
+      // Creating another proposal from approver1 fails
+      await expectRevert(
+        createProposal(approver1),
+        "Maximum open proposal limit reached"
+      );
+
+      // Create two more proposals from approver2
+      const [proposal2Id] = await createProposal(approver2);
+      await createProposal(approver2);
+
+      // Creating another proposal from approver2 fails
+      await expectRevert(
+        createProposal(approver2),
+        "Maximum open proposal limit reached"
+      );
+
+      // Close one of the proposals from approver1
+      await msa.closeProposal(proposal1Id, { from: approver1 });
+
+      // Approver1 can now create another proposal
+      await createProposal(approver1);
+
+      // Execute one of the proposals approver2 proposed
+      await msa.approve(proposal2Id, { from: approver1 });
+      await msa.approveAndExecute(proposal2Id, { from: approver2 });
+
+      // Approver2 can now create another proposal
+      await createProposal(approver2);
     });
 
     it("does not allow accounts that are not qualified approvers to create proposals", async () => {
@@ -1157,6 +1242,34 @@ contract("MultiSigAdmin", (accounts) => {
       expect((await target2.getBar()).toNumber()).to.equal(123);
     });
 
+    it("does not allow proposing and executing when the maximum number of open proposal per approver is reached for the proposer", async () => {
+      // maxOpenProposals for target2.setBar = 2
+      // Create two existing proposals
+      await msa.propose(
+        target2.address,
+        setBar,
+        web3.eth.abi.encodeParameters(["uint256"], [123]),
+        { from: approver1 }
+      );
+      await msa.propose(
+        target2.address,
+        setBar,
+        web3.eth.abi.encodeParameters(["uint256"], [456]),
+        { from: approver1 }
+      );
+
+      // Try creating another one by calling proposeAndExecute
+      await expectRevert(
+        msa.proposeAndExecute(
+          target2.address,
+          setBar,
+          web3.eth.abi.encodeParameters(["uint256"], [789]),
+          { from: approver1 }
+        ),
+        "Maximum open proposal limit reached"
+      );
+    });
+
     it("does not allow proposing and executing proposals that require more than one approval", async () => {
       await expectRevert(
         msa.proposeAndExecute(
@@ -1234,11 +1347,53 @@ contract("MultiSigAdmin", (accounts) => {
       expect(
         (await msa.getMinApprovals(target1.address, revertWithError)).toNumber()
       ).to.equal(1);
+      expect(
+        (
+          await msa.getMinApprovals(target1.address, revertWithoutError)
+        ).toNumber()
+      ).to.equal(1);
     });
 
     it("returns 0 when given a type of contract call that has not been configured", async () => {
       expect(
         (await msa.getMinApprovals(target2.address, revertWithError)).toNumber()
+      ).to.equal(0);
+    });
+  });
+
+  describe("getMaxOpenProposals", () => {
+    beforeEach(configure);
+
+    it("returns the minimum required number of approvals for a given type of contract call", async () => {
+      expect(
+        (await msa.getMaxOpenProposals(target1.address, setFoo)).toNumber()
+      ).to.equal(20);
+      expect(
+        (await msa.getMaxOpenProposals(target1.address, setBar)).toNumber()
+      ).to.equal(10);
+      expect(
+        (await msa.getMaxOpenProposals(target2.address, setFoo)).toNumber()
+      ).to.equal(3);
+      expect(
+        (await msa.getMaxOpenProposals(target2.address, setBar)).toNumber()
+      ).to.equal(2);
+      expect(
+        (
+          await msa.getMaxOpenProposals(target1.address, revertWithError)
+        ).toNumber()
+      ).to.equal(1);
+      expect(
+        (
+          await msa.getMaxOpenProposals(target1.address, revertWithoutError)
+        ).toNumber()
+      ).to.equal(1);
+    });
+
+    it("returns 0 when given a type of contract call that has not been configured", async () => {
+      expect(
+        (
+          await msa.getMaxOpenProposals(target2.address, revertWithError)
+        ).toNumber()
       ).to.equal(0);
     });
   });

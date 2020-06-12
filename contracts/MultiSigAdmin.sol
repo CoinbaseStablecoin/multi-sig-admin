@@ -24,6 +24,7 @@
 
 pragma solidity 0.6.8;
 
+import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import { EnumerableSetExtra } from "./util/EnumerableSetExtra.sol";
 import { Administrable } from "./util/Administrable.sol";
@@ -34,6 +35,7 @@ import { Administrable } from "./util/Administrable.sol";
  * smart contracts.
  */
 contract MultiSigAdmin is Administrable {
+    using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSetExtra for EnumerableSet.AddressSet;
@@ -43,11 +45,17 @@ contract MultiSigAdmin is Administrable {
         Configuration config;
         // IDs of open proposals for this type of contract call
         EnumerableSet.UintSet openProposals;
+        // Number of open proposals of each approver
+        mapping(address => uint256) numOpenProposals;
     }
 
     struct Configuration {
         // Minimum number of approvals required to execute a proposal
         uint256 minApprovals;
+        // Maximum number of open proposals per approver - if exceeded, the
+        // approver has to close or execute an existing open proposal to be able
+        // to create another proposal.
+        uint256 maxOpenProposals;
         // Addresses of qualified approvers - accounts that can propose,
         // approve, and execute proposals
         EnumerableSet.AddressSet approvers;
@@ -176,18 +184,19 @@ contract MultiSigAdmin is Administrable {
     constructor() public Administrable() {}
 
     /**
-     * @notice Configure who can approve and how many approvals are required for
-     * a given type of contract call
+     * @notice Configure requirements for a type of contract call
      * @dev minApprovals must be greater than zero.
      * @param targetContract    Address of the contract
      * @param selector          Selector of the function in the contract
      * @param minApprovals      Minimum number of approvals required
+     * @param maxOpenProposals  Maximum number of open proposals per approver
      * @param approvers         List of approvers' addresses
      */
     function configure(
         address targetContract,
         bytes4 selector,
         uint256 minApprovals,
+        uint256 maxOpenProposals,
         address[] calldata approvers
     ) external onlyAdmin {
         require(
@@ -199,11 +208,14 @@ contract MultiSigAdmin is Administrable {
             approvers.length >= minApprovals,
             "MultiSigAdmin: approvers fewer than minApprovals"
         );
+        require(
+            maxOpenProposals > 0,
+            "MultiSigAdmin: maxOpenProposals is zero"
+        );
 
         Configuration storage config = _types[targetContract][selector].config;
-
-        // Set minimum number of approvals
         config.minApprovals = minApprovals;
+        config.maxOpenProposals = maxOpenProposals;
 
         // Set approvers
         config.approvers.clear();
@@ -392,6 +404,21 @@ contract MultiSigAdmin is Administrable {
     }
 
     /**
+     * @notice Maximum number of open proposals per approver for a given type of
+     * contract call
+     * @param targetContract    Address of the contract
+     * @param selector          Selector of the function in the contract
+     * @return Minimum number of approvals required for execution
+     */
+    function getMaxOpenProposals(address targetContract, bytes4 selector)
+        external
+        view
+        returns (uint256)
+    {
+        return _types[targetContract][selector].config.maxOpenProposals;
+    }
+
+    /**
      * @notice List of approvers for a given type of contract call
      * @param targetContract    Address of the contract
      * @param selector          Selector of the function in the contract
@@ -556,13 +583,21 @@ contract MultiSigAdmin is Administrable {
      */
     function _closeProposal(uint256 proposalId, address closer) private {
         Proposal storage proposal = _proposals[proposalId];
+
         // Update state to Closed
         proposal.state = ProposalState.Closed;
 
+        ContractCallType storage callType = _types[proposal
+            .targetContract][proposal.selector];
+
         // Remove proposal from openProposals
-        _types[proposal.targetContract][proposal.selector].openProposals.remove(
-            proposalId
-        );
+        callType.openProposals.remove(proposalId);
+
+        // Decrement open proposal count for the proposer
+        address proposer = proposal.proposer;
+        callType.numOpenProposals[proposer] = callType
+            .numOpenProposals[proposer]
+            .sub(1);
 
         emit ProposalClosed(proposalId, closer);
     }
@@ -581,6 +616,13 @@ contract MultiSigAdmin is Administrable {
         bytes4 selector,
         bytes memory argumentData
     ) private returns (uint256) {
+        ContractCallType storage callType = _types[targetContract][selector];
+        uint256 numOpenProposals = callType.numOpenProposals[proposer];
+        require(
+            numOpenProposals < callType.config.maxOpenProposals,
+            "MultiSigAdmin: Maximum open proposal limit reached"
+        );
+
         uint256 proposalId = _nextProposalId++;
 
         Proposal storage proposal = _proposals[proposalId];
@@ -590,7 +632,11 @@ contract MultiSigAdmin is Administrable {
         proposal.selector = selector;
         proposal.argumentData = argumentData;
 
-        _types[targetContract][selector].openProposals.add(proposalId);
+        // Increment open proposal count for the proposer
+        callType.numOpenProposals[proposer] = numOpenProposals.add(1);
+
+        // Add proposal ID to the set of open proposals
+        callType.openProposals.add(proposalId);
 
         emit ProposalCreated(proposalId, proposer);
 
@@ -636,9 +682,18 @@ contract MultiSigAdmin is Administrable {
             "MultiSigAdmin: proposal needs more approvals"
         );
 
-        // Mark the proposal as executed and remove it from openProposals
+        // Mark the proposal as executed
         proposal.state = ProposalState.Executed;
+
+        // Remove the proposal ID from openProposals
         callType.openProposals.remove(proposalId);
+
+        // Decrement open proposal count for the proposer
+        address proposer = proposal.proposer;
+        callType.numOpenProposals[proposer] = callType
+            .numOpenProposals[proposer]
+            .sub(1);
+
         emit ProposalExecuted(proposalId, executor);
 
         // solhint-disable-next-line avoid-low-level-calls

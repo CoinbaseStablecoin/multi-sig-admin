@@ -220,8 +220,9 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
 
   /**
    * minApprovals must be greater than zero.
-   * Configure who can approve and how many approvals are required for a given type of contract call
+   * Configure requirements for a type of contract call
    * @param approvers List of approvers' addresses
+   * @param maxOpenProposals Maximum number of open proposals per approver
    * @param minApprovals Minimum number of approvals required
    * @param selector Selector of the function in the contract
    * @param targetContract Address of the contract
@@ -231,6 +232,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
       targetContract: string,
       selector: string,
       minApprovals: number | BN | string,
+      maxOpenProposals: number | BN | string,
       approvers: string[],
       txDetails?: Truffle.TransactionDetails
     ): Promise<Truffle.TransactionResponse<AllEvents>>;
@@ -238,6 +240,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
       targetContract: string,
       selector: string,
       minApprovals: number | BN | string,
+      maxOpenProposals: number | BN | string,
       approvers: string[],
       txDetails?: Truffle.TransactionDetails
     ): Promise<void>;
@@ -245,6 +248,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
       targetContract: string,
       selector: string,
       minApprovals: number | BN | string,
+      maxOpenProposals: number | BN | string,
       approvers: string[],
       txDetails?: Truffle.TransactionDetails
     ): Promise<string>;
@@ -252,6 +256,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
       targetContract: string,
       selector: string,
       minApprovals: number | BN | string,
+      maxOpenProposals: number | BN | string,
       approvers: string[],
       txDetails?: Truffle.TransactionDetails
     ): Promise<number>;
@@ -484,6 +489,17 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
   ): Promise<BN>;
 
   /**
+   * Maximum number of open proposals per approver for a given type of contract call
+   * @param selector Selector of the function in the contract
+   * @param targetContract Address of the contract
+   */
+  getMaxOpenProposals(
+    targetContract: string,
+    selector: string,
+    txDetails?: Truffle.TransactionDetails
+  ): Promise<BN>;
+
+  /**
    * List of approvers for a given type of contract call
    * @param selector Selector of the function in the contract
    * @param targetContract Address of the contract
@@ -702,8 +718,9 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
 
     /**
      * minApprovals must be greater than zero.
-     * Configure who can approve and how many approvals are required for a given type of contract call
+     * Configure requirements for a type of contract call
      * @param approvers List of approvers' addresses
+     * @param maxOpenProposals Maximum number of open proposals per approver
      * @param minApprovals Minimum number of approvals required
      * @param selector Selector of the function in the contract
      * @param targetContract Address of the contract
@@ -713,6 +730,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
         targetContract: string,
         selector: string,
         minApprovals: number | BN | string,
+        maxOpenProposals: number | BN | string,
         approvers: string[],
         txDetails?: Truffle.TransactionDetails
       ): Promise<Truffle.TransactionResponse<AllEvents>>;
@@ -720,6 +738,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
         targetContract: string,
         selector: string,
         minApprovals: number | BN | string,
+        maxOpenProposals: number | BN | string,
         approvers: string[],
         txDetails?: Truffle.TransactionDetails
       ): Promise<void>;
@@ -727,6 +746,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
         targetContract: string,
         selector: string,
         minApprovals: number | BN | string,
+        maxOpenProposals: number | BN | string,
         approvers: string[],
         txDetails?: Truffle.TransactionDetails
       ): Promise<string>;
@@ -734,6 +754,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
         targetContract: string,
         selector: string,
         minApprovals: number | BN | string,
+        maxOpenProposals: number | BN | string,
         approvers: string[],
         txDetails?: Truffle.TransactionDetails
       ): Promise<number>;
@@ -960,6 +981,17 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
      * @param targetContract Address of the contract
      */
     getMinApprovals(
+      targetContract: string,
+      selector: string,
+      txDetails?: Truffle.TransactionDetails
+    ): Promise<BN>;
+
+    /**
+     * Maximum number of open proposals per approver for a given type of contract call
+     * @param selector Selector of the function in the contract
+     * @param targetContract Address of the contract
+     */
+    getMaxOpenProposals(
       targetContract: string,
       selector: string,
       txDetails?: Truffle.TransactionDetails
