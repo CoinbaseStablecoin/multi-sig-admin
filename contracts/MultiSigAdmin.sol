@@ -185,7 +185,8 @@ contract MultiSigAdmin is Administrable {
 
     /**
      * @notice Configure requirements for a type of contract call
-     * @dev minApprovals must be greater than zero.
+     * @dev minApprovals must be greater than zero. This closes all affected
+     * proposals.
      * @param targetContract    Address of the contract
      * @param selector          Selector of the function in the contract
      * @param minApprovals      Minimum number of approvals required
@@ -213,7 +214,10 @@ contract MultiSigAdmin is Administrable {
             "MultiSigAdmin: maxOpenProposals is zero"
         );
 
-        Configuration storage config = _types[targetContract][selector].config;
+        ContractCallType storage callType = _types[targetContract][selector];
+        Configuration storage config = callType.config;
+
+        // Set minApprovals and maxOpenProposals
         config.minApprovals = minApprovals;
         config.maxOpenProposals = maxOpenProposals;
 
@@ -223,11 +227,15 @@ contract MultiSigAdmin is Administrable {
             config.approvers.add(approvers[i]);
         }
 
+        // Close existing open proposals
+        _closeOpenProposals(callType);
+
         emit ConfigurationChanged(targetContract, selector, msg.sender);
     }
 
     /**
-     * @notice Remove configuration for a given type of contract call
+     * @notice Remove the configuration for a given type of contract call
+     * @dev This closes all affected proposals.
      * @param targetContract    Address of the contract
      * @param selector          Selector of the function in the contract
      */
@@ -243,14 +251,8 @@ contract MultiSigAdmin is Administrable {
         config.minApprovals = 0;
         config.approvers.clear();
 
-        // Close open proposals
-        // Keep the open proposal count, because it changes as the list shrinks
-        uint256 openProposalCount = callType.openProposals.length();
-        for (uint256 i = 0; i < openProposalCount; i++) {
-            // Keep removing the first open proposal, because _clearProposal
-            // removes the closed proposal from the list
-            _closeProposal(callType.openProposals.at(0), msg.sender);
-        }
+        // Close existing open proposals
+        _closeOpenProposals(callType);
 
         emit ConfigurationRemoved(targetContract, selector, msg.sender);
     }
@@ -600,6 +602,19 @@ contract MultiSigAdmin is Administrable {
             .sub(1);
 
         emit ProposalClosed(proposalId, closer);
+    }
+
+    /**
+     * @notice Private function to close open proposals
+     * @param callType  Contract call type
+     */
+    function _closeOpenProposals(ContractCallType storage callType) private {
+        uint256 openProposalCount = callType.openProposals.length();
+        for (uint256 i = 0; i < openProposalCount; i++) {
+            // Keep removing the first open proposal, because _clearProposal
+            // removes the closed proposal from the list
+            _closeProposal(callType.openProposals.at(0), msg.sender);
+        }
     }
 
     /**

@@ -200,10 +200,49 @@ contract("MultiSigAdmin", (accounts) => {
         }
       );
 
-      await msa.configure(target1.address, setFoo, 1, 5, [approver1], {
-        from: admin2,
-      });
+      // Create some proposals
+      const [proposal1Id] = await proposeAndGetId(
+        target1.address,
+        setFoo,
+        [["string"], ["hello"]],
+        approver1
+      );
+      const [proposal2Id] = await proposeAndGetId(
+        target1.address,
+        setFoo,
+        [["string"], ["hello"]],
+        approver1
+      );
 
+      const res = await msa.configure(
+        target1.address,
+        setFoo,
+        1,
+        5,
+        [approver1],
+        {
+          from: admin2,
+        }
+      );
+
+      // Check that ProposalClosed and ConfigurationChanged events are emitted
+      const log1 = res.logs[0] as Truffle.TransactionLog<ProposalClosed>;
+      expect(log1.event).to.equal("ProposalClosed");
+      expect(log1.args[0].toNumber()).to.equal(proposal1Id);
+      expect(log1.args[1]).to.equal(admin2);
+
+      const log2 = res.logs[1] as Truffle.TransactionLog<ProposalClosed>;
+      expect(log2.event).to.equal("ProposalClosed");
+      expect(log2.args[0].toNumber()).to.equal(proposal2Id);
+      expect(log2.args[1]).to.equal(admin2);
+
+      const log3 = res.logs[2] as Truffle.TransactionLog<ConfigurationChanged>;
+      expect(log3.event).to.equal("ConfigurationChanged");
+      expect(log3.args[0]).to.equal(target1.address);
+      expect(log3.args[1]).to.equal(setFoo.padEnd(66, "0"));
+      expect(log3.args[2]).to.equal(admin2);
+
+      // Check that the configuration is updated
       expect(
         (await msa.getMinApprovals(target1.address, setFoo)).toNumber()
       ).to.equal(1);
@@ -213,6 +252,10 @@ contract("MultiSigAdmin", (accounts) => {
       expect(await msa.getApprovers(target1.address, setFoo)).to.eql([
         approver1,
       ]);
+
+      // Check that the existing open proposals are closed
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(2);
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(2);
     });
 
     it("does not allow the minimum number of approvals to be set to zero", async () => {

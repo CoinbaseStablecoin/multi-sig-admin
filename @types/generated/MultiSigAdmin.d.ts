@@ -219,7 +219,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
   };
 
   /**
-   * minApprovals must be greater than zero.
+   * minApprovals must be greater than zero. This closes all affected proposals.
    * Configure requirements for a type of contract call
    * @param approvers List of approvers' addresses
    * @param maxOpenProposals Maximum number of open proposals per approver
@@ -263,7 +263,8 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
   };
 
   /**
-   * Remove configuration for a given type of contract call
+   * This closes all affected proposals.
+   * Remove the configuration for a given type of contract call
    * @param selector Selector of the function in the contract
    * @param targetContract Address of the contract
    */
@@ -717,7 +718,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
     };
 
     /**
-     * minApprovals must be greater than zero.
+     * minApprovals must be greater than zero. This closes all affected proposals.
      * Configure requirements for a type of contract call
      * @param approvers List of approvers' addresses
      * @param maxOpenProposals Maximum number of open proposals per approver
@@ -761,7 +762,8 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
     };
 
     /**
-     * Remove configuration for a given type of contract call
+     * This closes all affected proposals.
+     * Remove the configuration for a given type of contract call
      * @param selector Selector of the function in the contract
      * @param targetContract Address of the contract
      */
