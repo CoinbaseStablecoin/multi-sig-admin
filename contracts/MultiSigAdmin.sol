@@ -742,7 +742,8 @@ contract MultiSigAdmin is Administrable {
             "MultiSigAdmin: Maximum open proposal limit reached"
         );
 
-        uint256 proposalId = _nextProposalId++;
+        uint256 proposalId = _nextProposalId;
+        _nextProposalId = _nextProposalId.add(1);
 
         Proposal storage proposal = _proposals[proposalId];
         proposal.state = ProposalState.Open;
