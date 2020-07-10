@@ -270,8 +270,9 @@ contract MultiSigAdmin is Administrable {
         ContractCallType storage callType = _types[targetContract][selector];
         Configuration storage config = callType.config;
 
-        // Reset minApprovals and approvers
+        // Reset minApprovals, maxOpenProposals, and approvers
         config.minApprovals = 0;
+        config.maxOpenProposals = 0;
         config.approvers.clear();
 
         // Close existing open proposals

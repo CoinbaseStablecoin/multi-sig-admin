@@ -447,9 +447,15 @@ contract("MultiSigAdmin", (accounts) => {
       expect(
         (await msa.getMinApprovals(target1.address, setFoo)).toNumber()
       ).to.equal(0);
+      expect(
+        (await msa.getMaxOpenProposals(target1.address, setFoo)).toNumber()
+      ).to.equal(0);
       expect(await msa.getApprovers(target1.address, setFoo)).to.eql([]);
       expect(
         (await msa.getMinApprovals(target2.address, setBar)).toNumber()
+      ).to.equal(0);
+      expect(
+        (await msa.getMaxOpenProposals(target2.address, setBar)).toNumber()
       ).to.equal(0);
       expect(await msa.getApprovers(target2.address, setBar)).to.eql([]);
 
