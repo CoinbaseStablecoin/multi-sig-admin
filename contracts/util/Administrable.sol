@@ -90,7 +90,7 @@ contract Administrable is Ownable {
         }
     }
 
-    function _addAdmin(address account) internal {
+    function _addAdmin(address account) private {
         require(
             account != address(0),
             "Administrable: given account is the zero address"
@@ -103,7 +103,7 @@ contract Administrable is Ownable {
         emit AdminAdded(account);
     }
 
-    function _removeAdmin(address account) internal {
+    function _removeAdmin(address account) private {
         require(
             _admins.remove(account),
             "Administrable: given account is not an admin"
