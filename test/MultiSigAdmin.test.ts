@@ -1148,6 +1148,27 @@ contract("MultiSigAdmin", (accounts) => {
       );
     });
 
+    it("does not allow executing a call to an externally owned account", async () => {
+      const target = accounts[9];
+
+      await msa.configure(target, setFoo, 1, 10, [approver1], {
+        from: admin1,
+      });
+
+      const [proposalId] = await proposeAndGetId(
+        target,
+        setFoo,
+        [["string"], ["hello"]],
+        approver1
+      );
+      await msa.approve(proposalId, { from: approver1 });
+
+      await expectRevert(
+        msa.execute(proposalId, { from: approver1 }),
+        "targetContract is not a contract"
+      );
+    });
+
     it("reverts execution with the reason of the failure if the contract call fails with an error message", async () => {
       // Call a function that intentionally reverts with a given error
       const [proposalId] = await proposeAndGetId(
@@ -1367,6 +1388,26 @@ contract("MultiSigAdmin", (accounts) => {
       );
     });
 
+    it("does not allow approving and executing a call to an externally owned account", async () => {
+      const target = accounts[9];
+
+      await msa.configure(target, setFoo, 1, 10, [approver1], {
+        from: admin1,
+      });
+
+      const [proposalId] = await proposeAndGetId(
+        target,
+        setFoo,
+        [["string"], ["hello"]],
+        approver1
+      );
+
+      await expectRevert(
+        msa.approveAndExecute(proposalId, { from: approver1 }),
+        "targetContract is not a contract"
+      );
+    });
+
     it("reverts approval and execution with the reason of the failure if the contract call fails", async () => {
       // Call a function that intentionally reverts with a given error
       const [proposalId] = await proposeAndGetId(
@@ -1523,6 +1564,24 @@ contract("MultiSigAdmin", (accounts) => {
           { from: owner }
         ),
         "caller is not an approver"
+      );
+    });
+
+    it("does not allow proposing and executing a call to an externally owned account", async () => {
+      const target = accounts[9];
+
+      await msa.configure(target, setFoo, 1, 10, [approver1], {
+        from: admin1,
+      });
+
+      await expectRevert(
+        msa.proposeAndExecute(
+          target,
+          setFoo,
+          web3.eth.abi.encodeParameters(["string"], ["hello"]),
+          { from: approver1 }
+        ),
+        "targetContract is not a contract"
       );
     });
 

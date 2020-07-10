@@ -25,6 +25,7 @@
 pragma solidity 0.6.8;
 
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
+import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import { EnumerableSetExtra } from "./util/EnumerableSetExtra.sol";
 import { Administrable } from "./util/Administrable.sol";
@@ -810,11 +811,17 @@ contract MultiSigAdmin is Administrable {
         );
 
         address targetContract = proposal.targetContract;
-        bytes4 selector = proposal.selector;
-        ContractCallType storage callType = _types[targetContract][selector];
+
+        require(
+            Address.isContract(targetContract),
+            "MultiSigAdmin: targetContract is not a contract"
+        );
 
         // Mark the proposal as executed
         proposal.state = ProposalState.Executed;
+
+        bytes4 selector = proposal.selector;
+        ContractCallType storage callType = _types[targetContract][selector];
 
         // Remove the proposal ID from openProposals
         callType.openProposals.remove(proposalId);
