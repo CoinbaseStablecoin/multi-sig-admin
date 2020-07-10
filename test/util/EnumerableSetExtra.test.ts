@@ -71,21 +71,5 @@ contract("EnumerableSetExtra", (accounts) => {
         ).to.eql([0, 123, 777]);
       });
     });
-
-    describe("clear", async () => {
-      it("removes all elements in the set", async () => {
-        await testContract.addUint(0);
-        await testContract.clearUintSet();
-        expect(await testContract.elementsInUintSet()).to.eql([]);
-
-        await testContract.addUint(0);
-        await testContract.addUint(1);
-        expect(
-          (await testContract.elementsInUintSet()).map((v) => v.toNumber())
-        ).to.eql([0, 1]);
-        await testContract.clearUintSet();
-        expect(await testContract.elementsInUintSet()).to.eql([]);
-      });
-    });
   });
 });

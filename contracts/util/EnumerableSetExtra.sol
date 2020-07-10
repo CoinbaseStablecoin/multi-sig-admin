@@ -34,7 +34,7 @@ library EnumerableSetExtra {
     using EnumerableSet for EnumerableSet.UintSet;
 
     /**
-     * @notice Remove all elements from the set
+     * @notice Remove all elements from the address set
      */
     function clear(EnumerableSet.AddressSet storage set) internal {
         bytes32[] storage values = set._inner._values;
@@ -47,7 +47,7 @@ library EnumerableSetExtra {
     }
 
     /**
-     * @notice Return all elements in the set as an array
+     * @notice Return all elements in the address set as an array
      */
     function elements(EnumerableSet.AddressSet storage set)
         internal
@@ -63,20 +63,7 @@ library EnumerableSetExtra {
     }
 
     /**
-     * @notice Remove all elements from the set
-     */
-    function clear(EnumerableSet.UintSet storage set) internal {
-        bytes32[] storage values = set._inner._values;
-        mapping(bytes32 => uint256) storage indexes = set._inner._indexes;
-        uint256 count = values.length;
-        for (uint256 i = 0; i < count; i++) {
-            delete indexes[values[i]];
-        }
-        delete set._inner._values;
-    }
-
-    /**
-     * @notice Return all elements in the set as an array
+     * @notice Return all elements in the uint set as an array
      */
     function elements(EnumerableSet.UintSet storage set)
         internal

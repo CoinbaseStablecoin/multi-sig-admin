@@ -55,8 +55,4 @@ contract EnumerableSetExtraTest {
     function clearAddressSet() external {
         _addressSet.clear();
     }
-
-    function clearUintSet() external {
-        _uintSet.clear();
-    }
 }

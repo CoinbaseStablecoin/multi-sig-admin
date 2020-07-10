@@ -64,15 +64,6 @@ export interface EnumerableSetExtraTestInstance
     estimateGas(txDetails?: Truffle.TransactionDetails): Promise<number>;
   };
 
-  clearUintSet: {
-    (txDetails?: Truffle.TransactionDetails): Promise<
-      Truffle.TransactionResponse<AllEvents>
-    >;
-    call(txDetails?: Truffle.TransactionDetails): Promise<void>;
-    sendTransaction(txDetails?: Truffle.TransactionDetails): Promise<string>;
-    estimateGas(txDetails?: Truffle.TransactionDetails): Promise<number>;
-  };
-
   methods: {
     addAddress: {
       (value: string, txDetails?: Truffle.TransactionDetails): Promise<
@@ -118,15 +109,6 @@ export interface EnumerableSetExtraTestInstance
     elementsInUintSet(txDetails?: Truffle.TransactionDetails): Promise<BN[]>;
 
     clearAddressSet: {
-      (txDetails?: Truffle.TransactionDetails): Promise<
-        Truffle.TransactionResponse<AllEvents>
-      >;
-      call(txDetails?: Truffle.TransactionDetails): Promise<void>;
-      sendTransaction(txDetails?: Truffle.TransactionDetails): Promise<string>;
-      estimateGas(txDetails?: Truffle.TransactionDetails): Promise<number>;
-    };
-
-    clearUintSet: {
       (txDetails?: Truffle.TransactionDetails): Promise<
         Truffle.TransactionResponse<AllEvents>
       >;
