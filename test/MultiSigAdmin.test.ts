@@ -274,6 +274,14 @@ contract("MultiSigAdmin", (accounts) => {
         }),
         "approvers fewer than minApprovals"
       );
+
+      // duplicated approvers
+      await expectRevert(
+        msa.configure(target1.address, setFoo, 2, 1, [approver1, approver1], {
+          from: admin1,
+        }),
+        "approvers fewer than minApprovals"
+      );
     });
 
     it("does not allow the maximum number of open proposals per approver to be set to zero", async () => {

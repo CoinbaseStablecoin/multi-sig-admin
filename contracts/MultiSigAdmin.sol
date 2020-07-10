@@ -206,10 +206,6 @@ contract MultiSigAdmin is Administrable {
         );
         require(minApprovals > 0, "MultiSigAdmin: minApprovals is zero");
         require(
-            approvers.length >= minApprovals,
-            "MultiSigAdmin: approvers fewer than minApprovals"
-        );
-        require(
             maxOpenProposals > 0,
             "MultiSigAdmin: maxOpenProposals is zero"
         );
@@ -217,15 +213,20 @@ contract MultiSigAdmin is Administrable {
         ContractCallType storage callType = _types[targetContract][selector];
         Configuration storage config = callType.config;
 
-        // Set minApprovals and maxOpenProposals
-        config.minApprovals = minApprovals;
-        config.maxOpenProposals = maxOpenProposals;
-
         // Set approvers
         config.approvers.clear();
         for (uint256 i = 0; i < approvers.length; i++) {
             config.approvers.add(approvers[i]);
         }
+
+        require(
+            config.approvers.length() >= minApprovals,
+            "MultiSigAdmin: approvers fewer than minApprovals"
+        );
+
+        // Set minApprovals and maxOpenProposals
+        config.minApprovals = minApprovals;
+        config.maxOpenProposals = maxOpenProposals;
 
         // Close existing open proposals
         _closeOpenProposals(callType);
