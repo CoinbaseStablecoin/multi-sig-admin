@@ -1,3 +1,4 @@
+import BN from "bn.js";
 import {
   MultiSigAdminInstance,
   TestTargetInstance,
@@ -1013,7 +1014,10 @@ contract("MultiSigAdmin", (accounts) => {
       await msa.approve(proposal1Id, { from: approver3 });
 
       // Execute the first proposal as the original proposer
-      let res = await msa.execute(proposal1Id, { from: approver1 });
+      let res = await msa.execute(proposal1Id, {
+        from: approver1,
+        value: new BN(10000),
+      });
 
       // Check that a ProposalExecuted event is emitted
       let log = res.logs[0] as Truffle.TransactionLog<ProposalExecuted>;
@@ -1041,6 +1045,8 @@ contract("MultiSigAdmin", (accounts) => {
       ).to.equal("such amaze");
       // Check that the call resulted in a state change
       expect(await target1.getFoo()).to.equal("such amaze");
+      // Check that the ETH provided is transferred
+      expect(await web3.eth.getBalance(target1.address)).to.equal("10000");
 
       // Approve the second proposal
       await msa.approve(proposal2Id, { from: approver1 });
@@ -1251,7 +1257,10 @@ contract("MultiSigAdmin", (accounts) => {
       await msa.approve(proposal1Id, { from: approver1 });
 
       // Approve and execute proposal 1
-      let res = await msa.approveAndExecute(proposal1Id, { from: approver2 });
+      let res = await msa.approveAndExecute(proposal1Id, {
+        from: approver2,
+        value: new BN(10000),
+      });
 
       // Check that ProposalApproveSubmitted and ProposalExecuted events are
       // emitted
@@ -1289,6 +1298,8 @@ contract("MultiSigAdmin", (accounts) => {
       ).to.equal("much wow");
       // Check that the call resulted in a state change
       expect(await target2.getFoo()).to.equal("much wow");
+      // Check that the ETH provided is transferred
+      expect(await web3.eth.getBalance(target2.address)).to.equal("10000");
 
       // Proposal 2 requires only 1 approval
       // Approve and execute proposal 2
@@ -1450,7 +1461,7 @@ contract("MultiSigAdmin", (accounts) => {
         target2.address,
         setBar,
         web3.eth.abi.encodeParameters(["uint256"], [123]),
-        { from: approver1 }
+        { from: approver1, value: new BN(10000) }
       );
 
       // Check that ProposalCreated, ProposalApprovalSubmitted, and
@@ -1493,6 +1504,8 @@ contract("MultiSigAdmin", (accounts) => {
       ).to.equal("123");
       // Check that the call resulted in a state change
       expect((await target2.getBar()).toNumber()).to.equal(123);
+      // Check that the ETH provided is transferred
+      expect(await web3.eth.getBalance(target2.address)).to.equal("10000");
     });
 
     it("does not allow proposing and executing when the maximum number of open proposal per approver is reached for the proposer", async () => {

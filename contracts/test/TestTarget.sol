@@ -35,7 +35,12 @@ contract TestTarget is Ownable {
 
     constructor() public Ownable() {}
 
-    function setFoo(string calldata foo) external onlyOwner returns (bool) {
+    function setFoo(string calldata foo)
+        external
+        payable
+        onlyOwner
+        returns (bool)
+    {
         _foo = foo;
         emit SetFooCalled(msg.sender, foo);
         return true;
@@ -45,7 +50,7 @@ contract TestTarget is Ownable {
         return _foo;
     }
 
-    function setBar(uint256 bar) external onlyOwner returns (bool) {
+    function setBar(uint256 bar) external payable onlyOwner returns (bool) {
         _bar = bar;
         emit SetBarCalled(msg.sender, bar);
         return true;
