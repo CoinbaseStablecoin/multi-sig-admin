@@ -327,7 +327,7 @@ contract MultiSigAdmin is Administrable {
         proposalIsOpen(proposalId)
         onlyApproverForProposal(proposalId)
     {
-        return _approve(msg.sender, proposalId);
+        _approve(msg.sender, proposalId);
     }
 
     /**
