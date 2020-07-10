@@ -194,8 +194,6 @@ contract MultiSigAdmin is Administrable {
         _;
     }
 
-    constructor() public Administrable() {}
-
     /**
      * @notice Configure requirements for a type of contract call
      * @dev minApprovals must be greater than zero. If updating an existing

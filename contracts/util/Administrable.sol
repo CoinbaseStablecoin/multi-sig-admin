@@ -37,8 +37,6 @@ contract Administrable is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSetExtra for EnumerableSet.AddressSet;
 
-    constructor() public Ownable() {}
-
     EnumerableSet.AddressSet private _admins;
 
     event AdminAdded(address indexed admin);
