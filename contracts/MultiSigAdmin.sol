@@ -197,8 +197,11 @@ contract MultiSigAdmin is Administrable {
 
     /**
      * @notice Configure requirements for a type of contract call
-     * @dev minApprovals must be greater than zero. This closes all affected
-     * proposals.
+     * @dev minApprovals must be greater than zero. If updating an existing
+     * configuration, this function will close all affected open proposals.
+     * This function will revert if any of the affected proposals is executable.
+     * To close all affected executable proposals before calling this function,
+     * call removeConfiguration with closeExecutable = true.
      * @param targetContract    Address of the contract
      * @param selector          Selector of the function in the contract
      * @param minApprovals      Minimum number of approvals required
@@ -241,7 +244,7 @@ contract MultiSigAdmin is Administrable {
         config.maxOpenProposals = maxOpenProposals;
 
         // Close existing open proposals
-        _closeOpenProposals(callType);
+        _closeOpenProposals(callType, false);
 
         emit ConfigurationChanged(targetContract, selector, msg.sender);
     }
@@ -251,12 +254,14 @@ contract MultiSigAdmin is Administrable {
      * @dev This closes all affected proposals.
      * @param targetContract    Address of the contract
      * @param selector          Selector of the function in the contract
+     * @param closeExecutable   If false, this function will revert if any of
+     * the affected open proposals to be closed is executable
      */
-    function removeConfiguration(address targetContract, bytes4 selector)
-        external
-        onlyAdmin
-        configurationExists(targetContract, selector)
-    {
+    function removeConfiguration(
+        address targetContract,
+        bytes4 selector,
+        bool closeExecutable
+    ) external onlyAdmin configurationExists(targetContract, selector) {
         ContractCallType storage callType = _types[targetContract][selector];
         Configuration storage config = callType.config;
 
@@ -265,7 +270,7 @@ contract MultiSigAdmin is Administrable {
         config.approvers.clear();
 
         // Close existing open proposals
-        _closeOpenProposals(callType);
+        _closeOpenProposals(callType, closeExecutable);
 
         emit ConfigurationRemoved(targetContract, selector, msg.sender);
     }
@@ -684,14 +689,29 @@ contract MultiSigAdmin is Administrable {
 
     /**
      * @notice Private function to close open proposals
-     * @param callType  Contract call type
+     * @param callType          Contract call type
+     * @param closeExecutable   If false, this function will revert if any of
+     * the open proposals to be closed is executable
      */
-    function _closeOpenProposals(ContractCallType storage callType) private {
+    function _closeOpenProposals(
+        ContractCallType storage callType,
+        bool closeExecutable
+    ) private {
         uint256 openProposalCount = callType.openProposals.length();
         for (uint256 i = 0; i < openProposalCount; i++) {
             // Keep removing the first open proposal, because _clearProposal
             // removes the closed proposal from the list
-            _closeProposal(callType.openProposals.at(0), msg.sender);
+            uint256 proposalId = callType.openProposals.at(0);
+
+            if (!closeExecutable) {
+                require(
+                    _proposals[proposalId].state !=
+                        ProposalState.OpenAndExecutable,
+                    "MultiSigAdmin: an executable proposal exists"
+                );
+            }
+
+            _closeProposal(proposalId, msg.sender);
         }
     }
 

@@ -85,9 +85,7 @@ contract("MultiSigAdmin", (accounts) => {
         2,
         3,
         [approver1, approver2],
-        {
-          from: admin2,
-        }
+        { from: admin2 }
       ),
       await msa.configure(
         target2.address,
@@ -95,9 +93,7 @@ contract("MultiSigAdmin", (accounts) => {
         1,
         2,
         [approver1, approver2],
-        {
-          from: admin2,
-        }
+        { from: admin2 }
       ),
       await msa.configure(target1.address, revertWithError, 1, 1, [approver1], {
         from: admin1,
@@ -108,9 +104,7 @@ contract("MultiSigAdmin", (accounts) => {
         1,
         1,
         [approver1],
-        {
-          from: admin1,
-        }
+        { from: admin1 }
       ),
     ];
   };
@@ -204,9 +198,7 @@ contract("MultiSigAdmin", (accounts) => {
         2,
         3,
         [approver1, approver2, approver3],
-        {
-          from: admin1,
-        }
+        { from: admin1 }
       );
 
       // Create some proposals
@@ -229,9 +221,7 @@ contract("MultiSigAdmin", (accounts) => {
         1,
         5,
         [approver1],
-        {
-          from: admin2,
-        }
+        { from: admin2 }
       );
 
       // Check that ProposalClosed and ConfigurationChanged events are emitted
@@ -268,6 +258,44 @@ contract("MultiSigAdmin", (accounts) => {
       );
       expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
         ProposalState.Closed
+      );
+    });
+
+    it("reverts if any of the affected open proposals is executable when updating an existing configuration", async () => {
+      await msa.configure(
+        target1.address,
+        setFoo,
+        2,
+        3,
+        [approver1, approver2, approver3],
+        { from: admin1 }
+      );
+
+      // Create some proposals
+      const [proposal1Id] = await proposeAndGetId(
+        target1.address,
+        setFoo,
+        [["string"], ["hello"]],
+        approver1
+      );
+      await proposeAndGetId(
+        target1.address,
+        setFoo,
+        [["string"], ["hello"]],
+        approver1
+      );
+
+      // Approve proposal 1
+      await msa.approve(proposal1Id, { from: approver1 });
+      await msa.approve(proposal1Id, { from: approver2 });
+      await msa.approve(proposal1Id, { from: approver3 });
+
+      // Check that the function reverts when closeExecutable is false
+      await expectRevert(
+        msa.configure(target1.address, setFoo, 1, 5, [approver1], {
+          from: admin2,
+        }),
+        "an executable proposal exists"
       );
     });
 
@@ -359,12 +387,18 @@ contract("MultiSigAdmin", (accounts) => {
     });
 
     it("allows admins to remove existing configurations", async () => {
-      const res1 = await msa.removeConfiguration(target1.address, setFoo, {
-        from: admin2,
-      });
-      const res2 = await msa.removeConfiguration(target2.address, setBar, {
-        from: admin1,
-      });
+      const res1 = await msa.removeConfiguration(
+        target1.address,
+        setFoo,
+        false,
+        { from: admin2 }
+      );
+      const res2 = await msa.removeConfiguration(
+        target2.address,
+        setBar,
+        false,
+        { from: admin1 }
+      );
 
       // Check that ProposalClosed events are emitted
       const log1_1 = res1.logs[0] as Truffle.TransactionLog<ProposalClosed>;
@@ -411,23 +445,69 @@ contract("MultiSigAdmin", (accounts) => {
       );
     });
 
+    it("reverts if any of the affected open proposals is executable unless closeExecutable argument is true", async () => {
+      // Approve proposal 1
+      await msa.approve(proposal1Id, { from: approver1 });
+      await msa.approve(proposal1Id, { from: approver2 });
+      await msa.approve(proposal1Id, { from: approver3 });
+
+      // Check that the function reverts when closeExecutable is false
+      await expectRevert(
+        msa.removeConfiguration(target1.address, setFoo, false, {
+          from: admin2,
+        }),
+        "an executable proposal exists"
+      );
+
+      // Check that the function does not revert when closeExecutable is true
+      const res = await msa.removeConfiguration(target1.address, setFoo, true, {
+        from: admin2,
+      });
+
+      // Check that ProposalClosed events are emitted
+      const log1 = res.logs[0] as Truffle.TransactionLog<ProposalClosed>;
+      expect(log1.event).to.equal("ProposalClosed");
+      expect(log1.args[0].toNumber()).to.equal(proposal1Id);
+      expect(log1.args[1]).to.equal(admin2);
+
+      const log2 = res.logs[1] as Truffle.TransactionLog<ProposalClosed>;
+      expect(log2.event).to.equal("ProposalClosed");
+      expect(log2.args[0].toNumber()).to.equal(proposal2Id);
+      expect(log2.args[1]).to.equal(admin2);
+
+      // Check that ConfigurationRemoved events are emitted
+      const log3 = res.logs[2] as Truffle.TransactionLog<ConfigurationRemoved>;
+      expect(log3.event).to.equal("ConfigurationRemoved");
+      expect(log3.args[0]).to.equal(target1.address);
+      expect(log3.args[1]).to.equal(setFoo.padEnd(66, "0"));
+      expect(log3.args[2]).to.equal(admin2);
+    });
+
     it("does not allow admins to remove a configuration that does not exist", async () => {
-      await msa.removeConfiguration(target1.address, setFoo, { from: admin1 });
+      await msa.removeConfiguration(target1.address, setFoo, false, {
+        from: admin1,
+      });
 
       await expectRevert(
-        msa.removeConfiguration(target1.address, setFoo, { from: admin1 }),
+        msa.removeConfiguration(target1.address, setFoo, false, {
+          from: admin1,
+        }),
         "configuration does not exist"
       );
     });
 
     it("does not allow accounts that are not admins to remove a configuration", async () => {
       await expectRevert(
-        msa.removeConfiguration(target1.address, setFoo, { from: approver1 }),
+        msa.removeConfiguration(target1.address, setFoo, false, {
+          from: approver1,
+        }),
         "caller is not an admin"
       );
 
       await expectRevert(
-        msa.removeConfiguration(target1.address, setBar, { from: approver2 }),
+        msa.removeConfiguration(target1.address, setBar, false, {
+          from: approver2,
+        }),
         "caller is not an admin"
       );
     });

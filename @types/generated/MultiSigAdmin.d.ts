@@ -227,7 +227,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
   };
 
   /**
-   * minApprovals must be greater than zero. This closes all affected proposals.
+   * minApprovals must be greater than zero. If updating an existing configuration, this function will close all affected open proposals. This function will revert if any of the affected proposals is executable. To close all affected executable proposals before calling this function, call removeConfiguration with closeExecutable = true.
    * Configure requirements for a type of contract call
    * @param approvers List of approvers' addresses
    * @param maxOpenProposals Maximum number of open proposals per approver
@@ -273,6 +273,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
   /**
    * This closes all affected proposals.
    * Remove the configuration for a given type of contract call
+   * @param closeExecutable If false, this function will revert if any of the affected open proposals to be closed is executable
    * @param selector Selector of the function in the contract
    * @param targetContract Address of the contract
    */
@@ -280,21 +281,25 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
     (
       targetContract: string,
       selector: string,
+      closeExecutable: boolean,
       txDetails?: Truffle.TransactionDetails
     ): Promise<Truffle.TransactionResponse<AllEvents>>;
     call(
       targetContract: string,
       selector: string,
+      closeExecutable: boolean,
       txDetails?: Truffle.TransactionDetails
     ): Promise<void>;
     sendTransaction(
       targetContract: string,
       selector: string,
+      closeExecutable: boolean,
       txDetails?: Truffle.TransactionDetails
     ): Promise<string>;
     estimateGas(
       targetContract: string,
       selector: string,
+      closeExecutable: boolean,
       txDetails?: Truffle.TransactionDetails
     ): Promise<number>;
   };
@@ -738,7 +743,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
     };
 
     /**
-     * minApprovals must be greater than zero. This closes all affected proposals.
+     * minApprovals must be greater than zero. If updating an existing configuration, this function will close all affected open proposals. This function will revert if any of the affected proposals is executable. To close all affected executable proposals before calling this function, call removeConfiguration with closeExecutable = true.
      * Configure requirements for a type of contract call
      * @param approvers List of approvers' addresses
      * @param maxOpenProposals Maximum number of open proposals per approver
@@ -784,6 +789,7 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
     /**
      * This closes all affected proposals.
      * Remove the configuration for a given type of contract call
+     * @param closeExecutable If false, this function will revert if any of the affected open proposals to be closed is executable
      * @param selector Selector of the function in the contract
      * @param targetContract Address of the contract
      */
@@ -791,21 +797,25 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
       (
         targetContract: string,
         selector: string,
+        closeExecutable: boolean,
         txDetails?: Truffle.TransactionDetails
       ): Promise<Truffle.TransactionResponse<AllEvents>>;
       call(
         targetContract: string,
         selector: string,
+        closeExecutable: boolean,
         txDetails?: Truffle.TransactionDetails
       ): Promise<void>;
       sendTransaction(
         targetContract: string,
         selector: string,
+        closeExecutable: boolean,
         txDetails?: Truffle.TransactionDetails
       ): Promise<string>;
       estimateGas(
         targetContract: string,
         selector: string,
+        closeExecutable: boolean,
         txDetails?: Truffle.TransactionDetails
       ): Promise<number>;
     };
