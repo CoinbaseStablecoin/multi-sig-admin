@@ -544,6 +544,18 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
   ): Promise<BN[]>;
 
   /**
+   * Avoid calling this function from another contract, and only use it outside of a tranasction (eth_call), as this function is inefficient in terms of gas usage due to the limitations of dynamic memory arrays.
+   * List of IDs of executable proposals (i.e. open proposals that have received the required number of approvals) for a given type of contract call
+   * @param selector Selector of the function in the contract
+   * @param targetContract Address of the contract
+   */
+  getExecutableProposals(
+    targetContract: string,
+    selector: string,
+    txDetails?: Truffle.TransactionDetails
+  ): Promise<BN[]>;
+
+  /**
    * Number of approvals received for a given proposal
    * @param proposalId Proposal ID
    */
@@ -1037,6 +1049,18 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
      * @param targetContract Address of the contract
      */
     getOpenProposals(
+      targetContract: string,
+      selector: string,
+      txDetails?: Truffle.TransactionDetails
+    ): Promise<BN[]>;
+
+    /**
+     * Avoid calling this function from another contract, and only use it outside of a tranasction (eth_call), as this function is inefficient in terms of gas usage due to the limitations of dynamic memory arrays.
+     * List of IDs of executable proposals (i.e. open proposals that have received the required number of approvals) for a given type of contract call
+     * @param selector Selector of the function in the contract
+     * @param targetContract Address of the contract
+     */
+    getExecutableProposals(
       targetContract: string,
       selector: string,
       txDetails?: Truffle.TransactionDetails

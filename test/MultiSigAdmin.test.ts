@@ -1652,11 +1652,107 @@ contract("MultiSigAdmin", (accounts) => {
           id.toNumber()
         )
       ).to.eql([proposal1Id, proposal2Id]);
+
+      // check that the executable proposals are included in the result
+      await msa.approve(proposal3Id, { from: approver1 });
+      expect((await msa.getProposalState(proposal3Id)).toNumber()).to.equal(
+        ProposalState.OpenAndExecutable
+      );
+      expect(
+        (await msa.getOpenProposals(target2.address, setBar)).map((id) =>
+          id.toNumber()
+        )
+      ).to.eql([proposal3Id]);
     });
 
     it("returns an empty list when given a type of contract call that has not been configured", async () => {
       expect(
         await msa.getOpenProposals(target1.address, revertWithError)
+      ).to.eql([]);
+    });
+  });
+
+  describe("getExecutableProposals", () => {
+    beforeEach(configure);
+
+    it("returns the list of proposals that are currently open and executable for a given type of contract call", async () => {
+      expect(await msa.getExecutableProposals(target1.address, setFoo)).to.eql(
+        []
+      );
+
+      const [proposal1Id] = await proposeAndGetId(
+        target1.address,
+        setFoo,
+        [["string"], ["hello"]],
+        approver1
+      );
+      expect(
+        (await msa.getExecutableProposals(target1.address, setFoo)).map((id) =>
+          id.toNumber()
+        )
+      ).to.eql([]);
+
+      // Approve proposal 1
+      await msa.approve(proposal1Id, { from: approver1 });
+      await msa.approve(proposal1Id, { from: approver2 });
+      await msa.approve(proposal1Id, { from: approver3 });
+
+      expect(
+        (await msa.getExecutableProposals(target1.address, setFoo)).map((id) =>
+          id.toNumber()
+        )
+      ).to.eql([proposal1Id]);
+
+      const [proposal2Id] = await proposeAndGetId(
+        target1.address,
+        setFoo,
+        [["string"], ["world"]],
+        approver1
+      );
+
+      // Approve proposal 2
+      await msa.approve(proposal2Id, { from: approver1 });
+      await msa.approve(proposal2Id, { from: approver2 });
+      await msa.approve(proposal2Id, { from: approver3 });
+
+      expect(
+        (await msa.getExecutableProposals(target1.address, setFoo)).map((id) =>
+          id.toNumber()
+        )
+      ).to.eql([proposal1Id, proposal2Id]);
+
+      const [proposal3Id] = await proposeAndGetId(
+        target2.address,
+        setBar,
+        [["uint256"], [123]],
+        approver1
+      );
+
+      expect(
+        (await msa.getExecutableProposals(target2.address, setBar)).map((id) =>
+          id.toNumber()
+        )
+      ).to.eql([]);
+
+      // Approve proposal 3
+      await msa.approve(proposal3Id, { from: approver1 });
+
+      expect(
+        (await msa.getExecutableProposals(target2.address, setBar)).map((id) =>
+          id.toNumber()
+        )
+      ).to.eql([proposal3Id]);
+
+      expect(
+        (await msa.getExecutableProposals(target1.address, setFoo)).map((id) =>
+          id.toNumber()
+        )
+      ).to.eql([proposal1Id, proposal2Id]);
+    });
+
+    it("returns an empty list when given a type of contract call that has not been configured", async () => {
+      expect(
+        await msa.getExecutableProposals(target1.address, revertWithError)
       ).to.eql([]);
     });
   });

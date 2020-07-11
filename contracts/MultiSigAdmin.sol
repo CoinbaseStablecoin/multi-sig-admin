@@ -502,6 +502,53 @@ contract MultiSigAdmin is Administrable {
     }
 
     /**
+     * @notice List of IDs of executable proposals (i.e. open proposals that
+     * have received the required number of approvals) for a given type of
+     * contract call
+     * @dev Avoid calling this function from another contract, and only use it
+     * outside of a tranasction (eth_call), as this function is inefficient in
+     * terms of gas usage due to the limitations of dynamic memory arrays.
+     * @param targetContract    Address of the contract
+     * @param selector          Selector of the function in the contract
+     * @return List of IDs of executable proposals
+     */
+    function getExecutableProposals(address targetContract, bytes4 selector)
+        external
+        view
+        returns (uint256[] memory)
+    {
+        uint256[] memory openProposals = _types[targetContract][selector]
+            .openProposals
+            .elements();
+
+        uint256[] memory executableProposals = new uint256[](
+            openProposals.length
+        );
+        uint256 numExecutableProposals = 0;
+
+        // Iterate through open proposals and find executable proposals
+        for (uint256 i = 0; i < openProposals.length; i++) {
+            uint256 proposalId = openProposals[i];
+            if (
+                _proposals[proposalId].state == ProposalState.OpenAndExecutable
+            ) {
+                executableProposals[numExecutableProposals++] = proposalId;
+            }
+        }
+
+        // Now that the number of executable proposals is known, create a
+        // an array of the exact size needed and copy contents
+        uint256[] memory executableProposalsResized = new uint256[](
+            numExecutableProposals
+        );
+        for (uint256 i = 0; i < numExecutableProposals; i++) {
+            executableProposalsResized[i] = executableProposals[i];
+        }
+
+        return executableProposalsResized;
+    }
+
+    /**
      * @notice Number of approvals received for a given proposal
      * @param proposalId    Proposal ID
      * @return Number of approvals
