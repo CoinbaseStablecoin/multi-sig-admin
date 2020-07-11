@@ -11,6 +11,7 @@ import {
   ProposalClosed,
   ProposalApprovalSubmitted,
   ProposalExecuted,
+  ProposalApprovalRescinded,
 } from "../@types/generated/MultiSigAdmin";
 import { TransactionRawLog } from "../@types/TransactionRawLog";
 import { expectRevert, bytes32FromAddress } from "./helpers";
@@ -19,6 +20,14 @@ import { behavesLikeAdministrable } from "./util/Administrable.behavior";
 
 const MultiSigAdmin = artifacts.require("MultiSigAdmin");
 const TestTarget = artifacts.require("TestTarget");
+
+enum ProposalState {
+  NotExist = 0,
+  Open,
+  OpenAndExecutable,
+  Closed,
+  Executed,
+}
 
 contract("MultiSigAdmin", (accounts) => {
   const [owner, admin1, admin2, approver1, approver2, approver3] = accounts;
@@ -254,8 +263,12 @@ contract("MultiSigAdmin", (accounts) => {
       ]);
 
       // Check that the existing open proposals are closed
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(2);
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(2);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
     });
 
     it("does not allow the minimum number of approvals to be set to zero", async () => {
@@ -389,9 +402,13 @@ contract("MultiSigAdmin", (accounts) => {
       ).to.equal(0);
       expect(await msa.getApprovers(target2.address, setBar)).to.eql([]);
 
-      // Check that all existing open proposals are closed (2)
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(2);
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(2);
+      // Check that all existing open proposals are closed
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
     });
 
     it("does not allow admins to remove a configuration that does not exist", async () => {
@@ -445,8 +462,10 @@ contract("MultiSigAdmin", (accounts) => {
       expect(await msa.getArgumentData(proposalId)).to.equal(
         web3.eth.abi.encodeParameters(["string"], ["such amaze"])
       );
-      // Check that the proposal state is open (1 = open)
-      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(1);
+      // Check that the proposal state is open
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Open
+      );
       expect((await msa.getNumApprovals(proposalId)).toNumber()).to.equal(0);
       expect(await msa.getApprovals(proposalId)).to.eql([]);
       expect(await msa.isExecutable(proposalId)).to.equal(false);
@@ -561,9 +580,12 @@ contract("MultiSigAdmin", (accounts) => {
           id.toNumber()
         )
       ).to.eql([proposal1Id, proposal2Id]);
-      // State 1 = Open
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(1);
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(1);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Open
+      );
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Open
+      );
 
       // Close proposal 1
       let res = await msa.closeProposal(proposal1Id, { from: approver1 });
@@ -579,9 +601,12 @@ contract("MultiSigAdmin", (accounts) => {
           id.toNumber()
         )
       ).to.eql([proposal2Id]);
-      // State 2 = Closed
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(2);
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(1);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Open
+      );
 
       // Close proposal 2
       res = await msa.closeProposal(proposal2Id, { from: approver2 });
@@ -594,8 +619,12 @@ contract("MultiSigAdmin", (accounts) => {
 
       expect(await msa.getOpenProposals(target1.address, setFoo)).to.eql([]);
 
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(2);
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(2);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
     });
 
     it("does not allow accounts that are not the original proposers to close proposals", async () => {
@@ -675,11 +704,17 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log.event).to.equal("ProposalApprovalSubmitted");
       expect(log.args[0].toNumber()).to.equal(proposal1Id);
       expect(log.args[1]).to.equal(approver1);
+      expect(log.args[2].toNumber()).to.equal(1);
+      expect(log.args[3].toNumber()).to.equal(3);
 
       // Check that the number of approvals is increased
       expect((await msa.getNumApprovals(proposal1Id)).toNumber()).to.equal(1);
       // Check that the list of approvals includes the address of the approver
       expect(await msa.getApprovals(proposal1Id)).to.eql([approver1]);
+      // Check that the proposal state is still open
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Open
+      );
 
       // Second approval
       res = await msa.approve(proposal1Id, { from: approver2 });
@@ -688,12 +723,17 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log.event).to.equal("ProposalApprovalSubmitted");
       expect(log.args[0].toNumber()).to.equal(proposal1Id);
       expect(log.args[1]).to.equal(approver2);
+      expect(log.args[2].toNumber()).to.equal(2);
+      expect(log.args[3].toNumber()).to.equal(3);
 
       expect((await msa.getNumApprovals(proposal1Id)).toNumber()).to.equal(2);
       expect(await msa.getApprovals(proposal1Id)).to.eql([
         approver1,
         approver2,
       ]);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Open
+      );
 
       // Third approval
       res = await msa.approve(proposal1Id, { from: approver3 });
@@ -702,6 +742,8 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log.event).to.equal("ProposalApprovalSubmitted");
       expect(log.args[0].toNumber()).to.equal(proposal1Id);
       expect(log.args[1]).to.equal(approver3);
+      expect(log.args[2].toNumber()).to.equal(3);
+      expect(log.args[3].toNumber()).to.equal(3);
 
       expect((await msa.getNumApprovals(proposal1Id)).toNumber()).to.equal(3);
       expect(await msa.getApprovals(proposal1Id)).to.eql([
@@ -709,6 +751,10 @@ contract("MultiSigAdmin", (accounts) => {
         approver2,
         approver3,
       ]);
+      // Check that the proposal state is now open and executable
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.OpenAndExecutable
+      );
     });
 
     it("does not allow accounts that are not qualified approvers to submit approvals", async () => {
@@ -784,21 +830,31 @@ contract("MultiSigAdmin", (accounts) => {
       // Initially there is an approval
       expect((await msa.getNumApprovals(proposalId)).toNumber()).to.equal(1);
       expect(await msa.getApprovals(proposalId)).to.eql([approver1]);
+      // Check that the proposal state is initially open and executable
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.OpenAndExecutable
+      );
 
       // Rescind the approval
       const res = await msa.rescindApproval(proposalId, { from: approver1 });
 
-      // Check that a ProposalApprovalSubmitted is emitted
+      // Check that a ProposalApprovalRescinded is emitted
       const log = res.logs[0] as Truffle.TransactionLog<
-        ProposalApprovalSubmitted
+        ProposalApprovalRescinded
       >;
       expect(log.event).to.equal("ProposalApprovalRescinded");
       expect(log.args[0].toNumber()).to.equal(proposalId);
       expect(log.args[1]).to.equal(approver1);
+      expect(log.args[2].toNumber()).to.equal(0);
+      expect(log.args[3].toNumber()).to.equal(1);
 
       // Check that the approval is removed
       expect((await msa.getNumApprovals(proposalId)).toNumber()).to.equal(0);
       expect(await msa.getApprovals(proposalId)).to.eql([]);
+      // Check that the proposal state is rolled back to open
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Open
+      );
     });
 
     it("does not allow accounts that did not submit an approval to rescind", async () => {
@@ -885,8 +941,10 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log.args[0].toNumber()).to.equal(proposal1Id);
       expect(log.args[1]).to.equal(approver1);
 
-      // Check that the proposal is marked as executed (3 = executed)
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(3);
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
       expect(await msa.getOpenProposals(target1.address, setFoo)).to.eql([]);
 
       // Check that the contract call in the proposal (target1.setFoo) is made
@@ -917,8 +975,10 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log.args[0].toNumber()).to.equal(proposal2Id);
       expect(log.args[1]).to.equal(approver2);
 
-      // Check that the proposal is marked as executed (3 = Executed)
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(3);
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
       expect(await msa.getOpenProposals(target2.address, setBar)).to.eql([]);
 
       // Check that the contract call in the proposal (target2.setBar) is made
@@ -1024,8 +1084,11 @@ contract("MultiSigAdmin", (accounts) => {
         "call failed: something went wrong spectacularly"
       );
 
-      // Check that proposal state is still open, and not executed (1 = open)
-      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(1);
+      // Check that the proposal state is still open and executable, and not
+      // executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.OpenAndExecutable
+      );
       expect(
         (
           await msa.getOpenProposals(target1.address, revertWithError)
@@ -1049,8 +1112,11 @@ contract("MultiSigAdmin", (accounts) => {
         "call failed"
       );
 
-      // Check that proposal state is still open, and not executed (1 = open)
-      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(1);
+      // Check that the proposal state is still open and executable, and not
+      // executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.OpenAndExecutable
+      );
       expect(
         (
           await msa.getOpenProposals(target1.address, revertWithoutError)
@@ -1095,13 +1161,17 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log1.event).to.equal("ProposalApprovalSubmitted");
       expect(log1.args[0].toNumber()).to.equal(proposal1Id);
       expect(log1.args[1]).to.equal(approver2);
+      expect(log1.args[2].toNumber()).to.equal(2);
+      expect(log1.args[3].toNumber()).to.equal(2);
 
       expect(log2.event).to.equal("ProposalExecuted");
       expect(log2.args[0].toNumber()).to.equal(proposal1Id);
       expect(log1.args[1]).to.equal(approver2);
 
-      // Check that the proposal is marked as executed (3 = Executed)
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(3);
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
       expect(await msa.getOpenProposals(target2.address, setFoo)).to.eql([]);
 
       // Check that the contract call in the proposal (target2.setFoo) is made
@@ -1130,13 +1200,17 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log1.event).to.equal("ProposalApprovalSubmitted");
       expect(log1.args[0].toNumber()).to.equal(proposal2Id);
       expect(log1.args[1]).to.equal(approver1);
+      expect(log1.args[2].toNumber()).to.equal(1);
+      expect(log1.args[3].toNumber()).to.equal(1);
 
       expect(log2.event).to.equal("ProposalExecuted");
       expect(log2.args[0].toNumber()).to.equal(proposal2Id);
       expect(log1.args[1]).to.equal(approver1);
 
-      // Check that the proposal is marked as executed (3 = executed)
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(3);
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
       expect(await msa.getOpenProposals(target2.address, setBar)).to.eql([]);
 
       // Check that the contract call in the proposal (target2.setBar) is made
@@ -1232,8 +1306,11 @@ contract("MultiSigAdmin", (accounts) => {
       expect((await msa.getNumApprovals(proposalId)).toNumber()).to.equal(0);
       expect(await msa.getApprovals(proposalId)).to.eql([]);
 
-      // Check that proposal state is still open, and not executed (1 = Open)
-      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(1);
+      // Check that the proposal state is still open and not executable because
+      // the approval is reverted
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Open
+      );
       expect(
         (
           await msa.getOpenProposals(target1.address, revertWithError)
@@ -1269,12 +1346,16 @@ contract("MultiSigAdmin", (accounts) => {
       expect(log2.event).to.equal("ProposalApprovalSubmitted");
       expect(log2.args[0].toNumber()).to.equal(proposalId);
       expect(log2.args[1]).to.equal(approver1);
+      expect(log2.args[2].toNumber()).to.equal(1);
+      expect(log2.args[3].toNumber()).to.equal(1);
       expect(log3.event).to.equal("ProposalExecuted");
       expect(log3.args[0].toNumber()).to.equal(proposalId);
       expect(log3.args[1]).to.equal(approver1);
 
-      // Check that the proposal is marked as executed (3 = executed)
-      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(3);
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
       expect(await msa.getOpenProposals(target2.address, setFoo)).to.eql([]);
 
       // Check that the contract call in the proposal (target2.setBar) is made
@@ -1773,15 +1854,19 @@ contract("MultiSigAdmin", (accounts) => {
         [["uint256"], [123]],
         approver1
       );
-      // State 1 = Open
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(1);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Open
+      );
 
       await msa.approve(proposal1Id, { from: approver1 });
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(1);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.OpenAndExecutable
+      );
 
       await msa.execute(proposal1Id, { from: approver1 });
-      // State 3 = Executed
-      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(3);
+      expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
 
       const [proposal2Id] = await proposeAndGetId(
         target1.address,
@@ -1789,15 +1874,20 @@ contract("MultiSigAdmin", (accounts) => {
         [["string"], ["hello"]],
         approver1
       );
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(1);
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Open
+      );
 
       await msa.closeProposal(proposal2Id, { from: approver1 });
-      // State 2 = Closed
-      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(2);
+      expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
+        ProposalState.Closed
+      );
     });
 
     it("returns 0 (= NotExist) when given a proposal that does not exist", async () => {
-      expect((await msa.getProposalState(999)).toNumber()).to.equal(0);
+      expect((await msa.getProposalState(999)).toNumber()).to.equal(
+        ProposalState.NotExist
+      );
     });
   });
 

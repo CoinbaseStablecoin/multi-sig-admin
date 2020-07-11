@@ -64,8 +64,12 @@ export interface ProposalApprovalRescinded {
   args: {
     id: BN;
     approver: string;
+    numApprovals: BN;
+    minApprovals: BN;
     0: BN;
     1: string;
+    2: BN;
+    3: BN;
   };
 }
 
@@ -74,8 +78,12 @@ export interface ProposalApprovalSubmitted {
   args: {
     id: BN;
     approver: string;
+    numApprovals: BN;
+    minApprovals: BN;
     0: BN;
     1: string;
+    2: BN;
+    3: BN;
   };
 }
 

@@ -61,7 +61,13 @@ contract MultiSigAdmin is Administrable {
         EnumerableSet.AddressSet approvers;
     }
 
-    enum ProposalState { NotExist, Open, Closed, Executed }
+    enum ProposalState {
+        NotExist, // Default state (0) for nonexistent proposals
+        Open, // Proposal can receive approvals
+        OpenAndExecutable, // Proposal has received required number of approvals
+        Closed, // Proposal is closed
+        Executed // Proposal has been executed
+    }
 
     struct Proposal {
         ProposalState state;
@@ -103,11 +109,15 @@ contract MultiSigAdmin is Administrable {
     event ProposalClosed(uint256 indexed id, address indexed closer);
     event ProposalApprovalSubmitted(
         uint256 indexed id,
-        address indexed approver
+        address indexed approver,
+        uint256 numApprovals,
+        uint256 minApprovals
     );
     event ProposalApprovalRescinded(
         uint256 indexed id,
-        address indexed approver
+        address indexed approver,
+        uint256 numApprovals,
+        uint256 minApprovals
     );
     event ProposalExecuted(uint256 indexed id, address indexed executor);
 
@@ -158,8 +168,10 @@ contract MultiSigAdmin is Administrable {
      * @param proposalId    Proposal ID
      */
     modifier proposalIsOpen(uint256 proposalId) {
+        ProposalState state = _proposals[proposalId].state;
         require(
-            _proposals[proposalId].state == ProposalState.Open,
+            state == ProposalState.Open ||
+                state == ProposalState.OpenAndExecutable,
             "MultiSigAdmin: proposal is not open"
         );
         _;
@@ -317,14 +329,37 @@ contract MultiSigAdmin is Administrable {
         proposalIsOpen(proposalId)
         onlyApproverForProposal(proposalId)
     {
-        EnumerableSet.AddressSet storage approvals = _proposals[proposalId]
-            .approvals;
+        Proposal storage proposal = _proposals[proposalId];
+        EnumerableSet.AddressSet storage approvals = proposal.approvals;
+
         require(
             approvals.contains(msg.sender),
             "MultiSigAdmin: caller has not approved the proposal"
         );
+
         approvals.remove(msg.sender);
-        emit ProposalApprovalRescinded(proposalId, msg.sender);
+
+        uint256 numApprovals = proposal.approvals.length();
+        uint256 minApprovals = _types[proposal.targetContract][proposal
+            .selector]
+            .config
+            .minApprovals;
+
+        // if it was marked as executable, but no longer meets the required
+        // number of approvals, mark it as just open but not executable
+        if (
+            proposal.state == ProposalState.OpenAndExecutable &&
+            numApprovals < minApprovals
+        ) {
+            proposal.state = ProposalState.Open;
+        }
+
+        emit ProposalApprovalRescinded(
+            proposalId,
+            msg.sender,
+            numApprovals,
+            minApprovals
+        );
     }
 
     /**
@@ -499,12 +534,7 @@ contract MultiSigAdmin is Administrable {
      * @return True if executable
      */
     function isExecutable(uint256 proposalId) external view returns (bool) {
-        Proposal storage proposal = _proposals[proposalId];
-        uint256 minApprovals = _types[proposal.targetContract][proposal
-            .selector]
-            .config
-            .minApprovals;
-        return minApprovals > 0 && proposal.approvals.length() >= minApprovals;
+        return _proposals[proposalId].state == ProposalState.OpenAndExecutable;
     }
 
     /**
@@ -665,14 +695,33 @@ contract MultiSigAdmin is Administrable {
      * @param proposalId    Proposal ID
      */
     function _approve(address approver, uint256 proposalId) private {
-        EnumerableSet.AddressSet storage approvals = _proposals[proposalId]
-            .approvals;
+        Proposal storage proposal = _proposals[proposalId];
+        EnumerableSet.AddressSet storage approvals = proposal.approvals;
+
         require(
             !approvals.contains(approver),
             "MultiSigAdmin: caller has already approved the proposal"
         );
+
         approvals.add(approver);
-        emit ProposalApprovalSubmitted(proposalId, approver);
+
+        uint256 numApprovals = proposal.approvals.length();
+        uint256 minApprovals = _types[proposal.targetContract][proposal
+            .selector]
+            .config
+            .minApprovals;
+
+        // if the required number of approvals is met, mark it as executable
+        if (numApprovals >= minApprovals) {
+            proposal.state = ProposalState.OpenAndExecutable;
+        }
+
+        emit ProposalApprovalSubmitted(
+            proposalId,
+            approver,
+            numApprovals,
+            minApprovals
+        );
     }
 
     /**
@@ -687,16 +736,15 @@ contract MultiSigAdmin is Administrable {
         returns (bytes memory)
     {
         Proposal storage proposal = _proposals[proposalId];
-        address targetContract = proposal.targetContract;
-        bytes4 selector = proposal.selector;
-
-        ContractCallType storage callType = _types[targetContract][selector];
-        uint256 minApprovals = callType.config.minApprovals;
 
         require(
-            minApprovals > 0 && proposal.approvals.length() >= minApprovals,
+            proposal.state == ProposalState.OpenAndExecutable,
             "MultiSigAdmin: proposal needs more approvals"
         );
+
+        address targetContract = proposal.targetContract;
+        bytes4 selector = proposal.selector;
+        ContractCallType storage callType = _types[targetContract][selector];
 
         // Mark the proposal as executed
         proposal.state = ProposalState.Executed;
