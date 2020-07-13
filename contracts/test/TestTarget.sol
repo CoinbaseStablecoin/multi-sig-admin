@@ -32,6 +32,8 @@ contract TestTarget is Ownable {
 
     event SetFooCalled(address indexed caller, string value);
     event SetBarCalled(address indexed caller, uint256 value);
+    event ReceiveCalled(address indexed caller, uint256 value);
+    event FallbackCalled(address indexed caller, uint256 value);
 
     constructor() public Ownable() {}
 
@@ -67,5 +69,13 @@ contract TestTarget is Ownable {
     function revertWithoutError() external pure {
         // solhint-disable-next-line reason-string
         revert();
+    }
+
+    receive() external payable {
+        emit ReceiveCalled(msg.sender, msg.value);
+    }
+
+    fallback() external payable {
+        emit FallbackCalled(msg.sender, msg.value);
     }
 }

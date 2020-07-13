@@ -9,6 +9,16 @@ export interface TestTargetContract
   "new"(meta?: Truffle.TransactionDetails): Promise<TestTargetInstance>;
 }
 
+export interface FallbackCalled {
+  name: "FallbackCalled";
+  args: {
+    caller: string;
+    value: BN;
+    0: string;
+    1: BN;
+  };
+}
+
 export interface OwnershipTransferred {
   name: "OwnershipTransferred";
   args: {
@@ -16,6 +26,16 @@ export interface OwnershipTransferred {
     newOwner: string;
     0: string;
     1: string;
+  };
+}
+
+export interface ReceiveCalled {
+  name: "ReceiveCalled";
+  args: {
+    caller: string;
+    value: BN;
+    0: string;
+    1: BN;
   };
 }
 
@@ -39,7 +59,12 @@ export interface SetFooCalled {
   };
 }
 
-type AllEvents = OwnershipTransferred | SetBarCalled | SetFooCalled;
+type AllEvents =
+  | FallbackCalled
+  | OwnershipTransferred
+  | ReceiveCalled
+  | SetBarCalled
+  | SetFooCalled;
 
 export interface TestTargetInstance extends Truffle.ContractInstance {
   /**

@@ -1,6 +1,7 @@
 {
   "extends": "solhint:recommended",
   "rules": {
+    "avoid-low-level-calls": "off",
     "compiler-version": ["error", "^0.6.0"],
     "contract-name-camelcase": "off",
     "no-empty-blocks": "off",

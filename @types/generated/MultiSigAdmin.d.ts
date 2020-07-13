@@ -130,6 +130,8 @@ type AllEvents =
   | ProposalExecuted;
 
 export interface MultiSigAdminInstance extends Truffle.ContractInstance {
+  SELECTOR_NONE(txDetails?: Truffle.TransactionDetails): Promise<string>;
+
   /**
    * Add new admins
    * @param accounts Addresses of the new admins to add
@@ -646,6 +648,8 @@ export interface MultiSigAdminInstance extends Truffle.ContractInstance {
   ): Promise<string>;
 
   methods: {
+    SELECTOR_NONE(txDetails?: Truffle.TransactionDetails): Promise<string>;
+
     /**
      * Add new admins
      * @param accounts Addresses of the new admins to add

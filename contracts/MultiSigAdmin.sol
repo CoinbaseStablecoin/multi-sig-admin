@@ -81,6 +81,12 @@ contract MultiSigAdmin is Administrable {
     }
 
     /**
+     * @dev Use this selector to call the target contract without any calldata.
+     * It can be used to call receive Ether function (receive()).
+     */
+    bytes4 public constant SELECTOR_NONE = 0x00000000;
+
+    /**
      * @dev Preconfigured contract call types:
      * Contract address => Function selector => ContractCallType
      */
@@ -832,10 +838,16 @@ contract MultiSigAdmin is Administrable {
 
         emit ProposalExecuted(proposalId, executor);
 
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool success, bytes memory returnData) = targetContract.call{
-            value: msg.value
-        }(abi.encodePacked(selector, proposal.argumentData));
+        bool success;
+        bytes memory returnData;
+
+        if (selector == SELECTOR_NONE) {
+            (success, returnData) = targetContract.call{ value: msg.value }("");
+        } else {
+            (success, returnData) = targetContract.call{ value: msg.value }(
+                abi.encodePacked(selector, proposal.argumentData)
+            );
+        }
 
         if (!success) {
             string memory err = "MultiSigAdmin: call failed";

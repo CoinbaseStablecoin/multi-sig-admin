@@ -107,6 +107,22 @@ contract("MultiSigAdmin", (accounts) => {
         [approver1],
         { from: admin1 }
       ),
+      await msa.configure(
+        target1.address,
+        await msa.SELECTOR_NONE(),
+        1,
+        1,
+        [approver1],
+        { from: admin1 }
+      ),
+      await msa.configure(
+        target1.address,
+        "0xcafebabe", // a non-existent selector
+        1,
+        1,
+        [approver1],
+        { from: admin1 }
+      ),
     ];
   };
 
@@ -1083,6 +1099,92 @@ contract("MultiSigAdmin", (accounts) => {
       expect((await target2.getBar()).toNumber()).to.equal(123);
     });
 
+    it("allows qualified approvers to execute proposals to call the receive Ether function", async () => {
+      // SELECTOR_NONE is used to make contract calls with no call data
+      const SELECTOR_NONE = await msa.SELECTOR_NONE();
+      const [proposalId] = await proposeAndGetId(
+        target1.address,
+        SELECTOR_NONE,
+        null,
+        approver1
+      );
+      await msa.approve(proposalId, { from: approver1 });
+
+      const res = await msa.execute(proposalId, {
+        from: approver1,
+        value: new BN(10000),
+      });
+
+      // Check that a ProposalExecuted event is emitted
+      const log = res.logs[0] as Truffle.TransactionLog<ProposalExecuted>;
+      expect(log.event).to.equal("ProposalExecuted");
+      expect(log.args[0].toNumber()).to.equal(proposalId);
+      expect(log.args[1]).to.equal(approver1);
+
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
+      expect(await msa.getOpenProposals(target1.address, SELECTOR_NONE)).to.eql(
+        []
+      );
+
+      // Check that a ReceiveCalled event is emitted by the target contract
+      const callLog = res.receipt.rawLogs[1] as TransactionRawLog;
+      expect(callLog.address).to.equal(target1.address);
+      expect(callLog.topics[0]).to.equal(
+        web3.utils.keccak256("ReceiveCalled(address,uint256)")
+      );
+
+      // Check log parameters (caller, value)
+      expect(callLog.topics[1]).to.equal(bytes32FromAddress(msa.address));
+      expect(
+        web3.eth.abi.decodeParameters(["uint256"], callLog.data)[0]
+      ).to.equal("10000");
+    });
+
+    it("allows qualified approvers to execute proposals to call the fallback function", async () => {
+      const [proposalId] = await proposeAndGetId(
+        target1.address,
+        "0xcafebabe",
+        null,
+        approver1
+      );
+      await msa.approve(proposalId, { from: approver1 });
+
+      const res = await msa.execute(proposalId, {
+        from: approver1,
+        value: new BN(10000),
+      });
+
+      // Check that a ProposalExecuted event is emitted
+      const log = res.logs[0] as Truffle.TransactionLog<ProposalExecuted>;
+      expect(log.event).to.equal("ProposalExecuted");
+      expect(log.args[0].toNumber()).to.equal(proposalId);
+      expect(log.args[1]).to.equal(approver1);
+
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
+      expect(await msa.getOpenProposals(target1.address, "0xcafebabe")).to.eql(
+        []
+      );
+
+      // Check that a FallbackCalled event is emitted by the target contract
+      const callLog = res.receipt.rawLogs[1] as TransactionRawLog;
+      expect(callLog.address).to.equal(target1.address);
+      expect(callLog.topics[0]).to.equal(
+        web3.utils.keccak256("FallbackCalled(address,uint256)")
+      );
+
+      // Check log parameters (caller, value)
+      expect(callLog.topics[1]).to.equal(bytes32FromAddress(msa.address));
+      expect(
+        web3.eth.abi.decodeParameters(["uint256"], callLog.data)[0]
+      ).to.equal("10000");
+    });
+
     it("does not allow executing proposals that have not received required number of approvals", async () => {
       await expectRevert(
         msa.execute(proposal1Id, { from: approver1 }),
@@ -1252,7 +1354,7 @@ contract("MultiSigAdmin", (accounts) => {
       );
     });
 
-    it("allows qualified approvers to submit the last approval required, and execute in a single transaction", async () => {
+    it("allows qualified approvers to approve and execute proposals in a single transaction", async () => {
       // Proposal 1 requires 2 approvals
       await msa.approve(proposal1Id, { from: approver1 });
 
@@ -1276,7 +1378,7 @@ contract("MultiSigAdmin", (accounts) => {
 
       expect(log2.event).to.equal("ProposalExecuted");
       expect(log2.args[0].toNumber()).to.equal(proposal1Id);
-      expect(log1.args[1]).to.equal(approver2);
+      expect(log2.args[1]).to.equal(approver2);
 
       // Check that the proposal is marked as executed
       expect((await msa.getProposalState(proposal1Id)).toNumber()).to.equal(
@@ -1317,7 +1419,7 @@ contract("MultiSigAdmin", (accounts) => {
 
       expect(log2.event).to.equal("ProposalExecuted");
       expect(log2.args[0].toNumber()).to.equal(proposal2Id);
-      expect(log1.args[1]).to.equal(approver1);
+      expect(log2.args[1]).to.equal(approver1);
 
       // Check that the proposal is marked as executed
       expect((await msa.getProposalState(proposal2Id)).toNumber()).to.equal(
@@ -1339,6 +1441,103 @@ contract("MultiSigAdmin", (accounts) => {
       ).to.equal("456");
       // Check that the call resulted in a state change
       expect((await target2.getBar()).toNumber()).to.equal(456);
+    });
+
+    it("allows qualified approvers to approve and execute proposals to call the receive Ether function in a single transaction", async () => {
+      const SELECTOR_NONE = await msa.SELECTOR_NONE();
+      const [proposalId] = await proposeAndGetId(
+        target1.address,
+        SELECTOR_NONE,
+        null,
+        approver1
+      );
+
+      const res = await msa.approveAndExecute(proposalId, {
+        from: approver1,
+        value: new BN(10000),
+      });
+
+      // Check that ProposalApproveSubmitted and ProposalExecuted events are
+      // emitted
+      const log1 = res.logs[0] as Truffle.TransactionLog<
+        ProposalApprovalSubmitted
+      >;
+      const log2 = res.logs[1] as Truffle.TransactionLog<ProposalExecuted>;
+      expect(log1.event).to.equal("ProposalApprovalSubmitted");
+      expect(log1.args[0].toNumber()).to.equal(proposalId);
+      expect(log1.args[1]).to.equal(approver1);
+      expect(log2.event).to.equal("ProposalExecuted");
+      expect(log2.args[0].toNumber()).to.equal(proposalId);
+      expect(log2.args[1]).to.equal(approver1);
+
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
+      expect(await msa.getOpenProposals(target1.address, SELECTOR_NONE)).to.eql(
+        []
+      );
+
+      // Check that a ReceiveCalled event is emitted by the target contract
+      const callLog = res.receipt.rawLogs[2] as TransactionRawLog;
+      expect(callLog.address).to.equal(target1.address);
+      expect(callLog.topics[0]).to.equal(
+        web3.utils.keccak256("ReceiveCalled(address,uint256)")
+      );
+
+      // Check log parameters (caller, value)
+      expect(callLog.topics[1]).to.equal(bytes32FromAddress(msa.address));
+      expect(
+        web3.eth.abi.decodeParameters(["uint256"], callLog.data)[0]
+      ).to.equal("10000");
+    });
+
+    it("allows qualified approvers to approve and execute proposals to call the fallback function in a single transaction", async () => {
+      const [proposalId] = await proposeAndGetId(
+        target1.address,
+        "0xcafebabe",
+        null,
+        approver1
+      );
+
+      const res = await msa.approveAndExecute(proposalId, {
+        from: approver1,
+        value: new BN(10000),
+      });
+
+      // Check that ProposalApproveSubmitted and ProposalExecuted events are
+      // emitted
+      const log1 = res.logs[0] as Truffle.TransactionLog<
+        ProposalApprovalSubmitted
+      >;
+      const log2 = res.logs[1] as Truffle.TransactionLog<ProposalExecuted>;
+      expect(log1.event).to.equal("ProposalApprovalSubmitted");
+      expect(log1.args[0].toNumber()).to.equal(proposalId);
+      expect(log1.args[1]).to.equal(approver1);
+      expect(log2.event).to.equal("ProposalExecuted");
+      expect(log2.args[0].toNumber()).to.equal(proposalId);
+      expect(log2.args[1]).to.equal(approver1);
+
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
+      expect(await msa.getOpenProposals(target1.address, "0xcafebabe")).to.eql(
+        []
+      );
+
+      // Check that a FallbackCalled event is emitted by the target contract
+      const callLog = res.receipt.rawLogs[2] as TransactionRawLog;
+      expect(callLog.address).to.equal(target1.address);
+      expect(callLog.topics[0]).to.equal(
+        web3.utils.keccak256("FallbackCalled(address,uint256)")
+      );
+
+      // Check log parameters (caller, value)
+      expect(callLog.topics[1]).to.equal(bytes32FromAddress(msa.address));
+      expect(
+        web3.eth.abi.decodeParameters(["uint256"], callLog.data)[0]
+      ).to.equal("10000");
     });
 
     it("does not allow approving and executing proposals that have not received required number of approvals - 1", async () => {
@@ -1454,7 +1653,7 @@ contract("MultiSigAdmin", (accounts) => {
   describe("proposeAndExecute", () => {
     beforeEach(configure);
 
-    it("allows qualifier approvers to propose and execute proposals that only require 1 approval in a single transaction", async () => {
+    it("allows qualifier approvers to propose, approve, and execute proposals in a single transaction", async () => {
       // Propose, approve, and execute a proposal (target2.setBar is configured
       // to require only 1 approval)
       const res = await msa.proposeAndExecute(
@@ -1506,6 +1705,105 @@ contract("MultiSigAdmin", (accounts) => {
       expect((await target2.getBar()).toNumber()).to.equal(123);
       // Check that the ETH provided is transferred
       expect(await web3.eth.getBalance(target2.address)).to.equal("10000");
+    });
+
+    it("allows qualified approvers to propose, approve, and execute proposals to call the receive Ether function in a single transaction", async () => {
+      const SELECTOR_NONE = await msa.SELECTOR_NONE();
+      const res = await msa.proposeAndExecute(
+        target1.address,
+        SELECTOR_NONE,
+        "0x",
+        { from: approver1, value: new BN(10000) }
+      );
+
+      // Check that ProposalCreated, ProposalApprovalSubmitted, and
+      // ProposalExecuted events are submitted
+      // Check that a ProposalExecuted event is emitted
+      const log1 = res.logs[0] as Truffle.TransactionLog<ProposalCreated>;
+      const log2 = res.logs[1] as Truffle.TransactionLog<
+        ProposalApprovalSubmitted
+      >;
+      const log3 = res.logs[2] as Truffle.TransactionLog<ProposalExecuted>;
+      expect(log1.event).to.equal("ProposalCreated");
+      // Get the proposal ID from the ProposalCreated event
+      const proposalId = log1.args[0].toNumber();
+      expect(log1.args[1]).to.equal(approver1);
+      expect(log2.event).to.equal("ProposalApprovalSubmitted");
+      expect(log2.args[0].toNumber()).to.equal(proposalId);
+      expect(log2.args[1]).to.equal(approver1);
+      expect(log3.event).to.equal("ProposalExecuted");
+      expect(log3.args[0].toNumber()).to.equal(proposalId);
+      expect(log3.args[1]).to.equal(approver1);
+
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
+      expect(await msa.getOpenProposals(target1.address, SELECTOR_NONE)).to.eql(
+        []
+      );
+
+      // Check that a ReceiveCalled event is emitted by the target contract
+      const callLog = res.receipt.rawLogs[3] as TransactionRawLog;
+      expect(callLog.address).to.equal(target1.address);
+      expect(callLog.topics[0]).to.equal(
+        web3.utils.keccak256("ReceiveCalled(address,uint256)")
+      );
+
+      // Check log parameters (caller, value)
+      expect(callLog.topics[1]).to.equal(bytes32FromAddress(msa.address));
+      expect(
+        web3.eth.abi.decodeParameters(["uint256"], callLog.data)[0]
+      ).to.equal("10000");
+    });
+
+    it("allows qualified approvers to propose, approve and execute proposals to call the fallback function in a single transaction", async () => {
+      const res = await msa.proposeAndExecute(
+        target1.address,
+        "0xcafebabe",
+        "0x",
+        { from: approver1, value: new BN(10000) }
+      );
+
+      // Check that ProposalCreated, ProposalApprovalSubmitted, and
+      // ProposalExecuted events are submitted
+      // Check that a ProposalExecuted event is emitted
+      const log1 = res.logs[0] as Truffle.TransactionLog<ProposalCreated>;
+      const log2 = res.logs[1] as Truffle.TransactionLog<
+        ProposalApprovalSubmitted
+      >;
+      const log3 = res.logs[2] as Truffle.TransactionLog<ProposalExecuted>;
+      expect(log1.event).to.equal("ProposalCreated");
+      // Get the proposal ID from the ProposalCreated event
+      const proposalId = log1.args[0].toNumber();
+      expect(log1.args[1]).to.equal(approver1);
+      expect(log2.event).to.equal("ProposalApprovalSubmitted");
+      expect(log2.args[0].toNumber()).to.equal(proposalId);
+      expect(log2.args[1]).to.equal(approver1);
+      expect(log3.event).to.equal("ProposalExecuted");
+      expect(log3.args[0].toNumber()).to.equal(proposalId);
+      expect(log3.args[1]).to.equal(approver1);
+
+      // Check that the proposal is marked as executed
+      expect((await msa.getProposalState(proposalId)).toNumber()).to.equal(
+        ProposalState.Executed
+      );
+      expect(await msa.getOpenProposals(target1.address, "0xcafebabe")).to.eql(
+        []
+      );
+
+      // Check that a FallbackCalled event is emitted by the target contract
+      const callLog = res.receipt.rawLogs[3] as TransactionRawLog;
+      expect(callLog.address).to.equal(target1.address);
+      expect(callLog.topics[0]).to.equal(
+        web3.utils.keccak256("FallbackCalled(address,uint256)")
+      );
+
+      // Check log parameters (caller, value)
+      expect(callLog.topics[1]).to.equal(bytes32FromAddress(msa.address));
+      expect(
+        web3.eth.abi.decodeParameters(["uint256"], callLog.data)[0]
+      ).to.equal("10000");
     });
 
     it("does not allow proposing and executing when the maximum number of open proposal per approver is reached for the proposer", async () => {
