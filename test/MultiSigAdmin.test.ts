@@ -1288,7 +1288,7 @@ contract("MultiSigAdmin", (accounts) => {
       const [proposalId] = await proposeAndGetId(
         target1.address,
         revertWithError,
-        [["string"], ["something went wrong spectacularly"]],
+        [["string"], ["something went wrong"]],
         approver1
       );
       await msa.approve(proposalId, { from: approver1 });
@@ -1296,7 +1296,7 @@ contract("MultiSigAdmin", (accounts) => {
       // Check that it reverts with the reason of the failure
       await expectRevert(
         msa.execute(proposalId, { from: approver1 }),
-        "call failed: something went wrong spectacularly"
+        "call failed: something went wrong"
       );
 
       // Check that the proposal state is still open and executable, and not

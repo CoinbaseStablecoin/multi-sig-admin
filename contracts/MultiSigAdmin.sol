@@ -854,16 +854,21 @@ contract MultiSigAdmin is Administrable {
         if (!success) {
             string memory err = "MultiSigAdmin: call failed";
 
-            if (returnData.length <= 68) {
+            // Return data will be at least 100 bytes if it contains the reason
+            // string: Error(string) selector[4] + string offset[32] + string
+            // length[32] + string data[32] = 100
+            if (returnData.length < 100) {
                 revert(err);
             }
 
             // If the reason string exists, extract it, and bubble it up
+            string memory reason;
             assembly {
-                // Skip over the first four bytes (the selector)
-                returnData := add(returnData, 0x04)
+                // Skip over the bytes length[32] + Error(string) selector[4] +
+                // string offset[32] = 68 (0x44)
+                reason := add(returnData, 0x44)
             }
-            string memory reason = abi.decode(returnData, (string));
+
             revert(string(abi.encodePacked(err, ": ", reason)));
         }
 
