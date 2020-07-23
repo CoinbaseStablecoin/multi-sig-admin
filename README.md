@@ -16,6 +16,14 @@ $ yarn install        # Install dependencies
 $ yarn setup          # Setup Git hooks
 ```
 
+## TypeScript type definition files for the contracts
+
+To generate type definitions:
+
+```
+$ yarn compile && yarn typechain
+```
+
 ## Linting and Formatting
 
 To check code for problems:
@@ -32,14 +40,6 @@ To auto-format code:
 
 ```
 $ yarn fmt
-```
-
-## TypeScript type definition files for the contracts
-
-To generate type definitions:
-
-```
-$ yarn compile && yarn typechain
 ```
 
 ## Testing
